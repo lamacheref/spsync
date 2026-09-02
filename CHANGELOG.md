@@ -5,6 +5,11 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.10] - 2026-09-02
+
+### Fixed
+- `plugin.js:getNewIssuesForBacklog`: include `open` in addition to `new` (`owner_id AND (new OR open)`, was `new` only) — ticket 6608 `open` assigned to owner 3 was missed; add pagination fallback for `updated_at` index delay (like `searchIssues`) and set `defaultAutoAddToBacklog: true` (was `false`, so `+` nor auto-add triggered even when search found ticket)
+
 ## [0.3.9] - 2026-09-02
 
 ### Changed

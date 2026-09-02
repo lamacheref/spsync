@@ -1,7 +1,7 @@
 {
   "id": "zammad-spsync",
   "name": "Zammad SPsync",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "Sync Zammad tickets (out of waiting + newly assigned) to Super Productivity",
   "manifestVersion": 1,
   "minSupVersion": "14.0.2",
@@ -11,7 +11,7 @@
     "icon": "support",
     "humanReadableName": "Zammad",
     "issueProviderKey": "ZAMMAD",
-    "defaultAutoAddToBacklog": false
+    "defaultAutoAddToBacklog": true
   },
   "permissions": [
     "addTask",

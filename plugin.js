@@ -427,15 +427,15 @@ PluginAPI.registerIssueProvider({
     // Fallback: if lastSyncAt missing, look back 7 days to avoid flooding on first run
     if (!lastSyncAt) lastSyncAt = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-    // Build Zammad DSL query: prefer login/email field per user request (<ZAMMAD_USER>), fallback to owner_id
+    // Build Zammad DSL query: include open (user assigned often stays open, not new per test 6608) + handle index delay
     const iso = new Date(lastSyncAt).toISOString();
     const timeField = 'updated_at';
     let q;
     if (useDirectLoginQuery) {
       const field = directLogin.includes('@') ? 'owner.email' : 'owner.login';
-      q = `${field}:${directLogin} AND state.name:new AND ${timeField}:>${iso}`;
+      q = `${field}:${directLogin} AND (state.name:new OR state.name:open) AND ${timeField}:>${iso}`;
     } else {
-      q = `owner_id:${userId} AND state.name:new AND ${timeField}:>${iso}`;
+      q = `owner_id:${userId} AND (state.name:new OR state.name:open) AND ${timeField}:>${iso}`;
     }
     const url = `${base}/api/v1/tickets/search`;
     console.log('[Zammad SPsync] getNewIssuesForBacklog', { userId, q, lastSyncAt: iso });
@@ -445,6 +445,30 @@ PluginAPI.registerIssueProvider({
       const res = await http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout });
       tickets = Array.isArray(res) ? res : [];
       console.log('[Zammad SPsync] getNewIssuesForBacklog fetched', tickets.length);
+      // Fallback for recent tickets not yet in search index (e.g. 6608 created today) — pagination scan
+      if (tickets.length === 0) {
+        console.log('[Zammad SPsync] getNewIssuesForBacklog empty, trying pagination fallback for recent assigned');
+        try {
+          for (const page of [131, 130, 132]) {
+            try {
+              const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout });
+              const pageList = Array.isArray(pageRes) ? pageRes : [];
+              const filtered = pageList.filter((t) => {
+                const st = Number(t.state_id);
+                const isOpenOrNew = st === 1 || st === 2;
+                const owned = String(t.owner_id) === String(userId) || (useDirectLoginQuery && String(t.owner_id) === String(directLogin));
+                const upd = t.updated_at ? new Date(t.updated_at).getTime() : 0;
+                return isOpenOrNew && owned && upd > lastSyncAt;
+              });
+              if (filtered.length) {
+                console.log('[Zammad SPsync] pagination fallback found', filtered.length, 'on page', page);
+                tickets = filtered;
+                break;
+              }
+            } catch {}
+          }
+        } catch {}
+      }
     } catch (e) {
       const msg = e && (e.message || e.status || String(e));
       console.error('[Zammad SPsync] getNewIssuesForBacklog failed', msg);
