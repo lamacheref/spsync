@@ -575,19 +575,18 @@ PluginAPI.registerIssueProvider({
       });
     }
 
-    // Directly index in dedicated "Zammad" project (user wants tasks there, not just backlog) — handles backlog empty / disabled
-    // This ensures tasks appear in the Zammad project's task list even if backlog is not visible
+    // Directly index in dedicated “Zammad” project (user wants auto-index there) — handles backlog empty / disabled
+    // For manual `+` via Issue Panel search, SP itself creates the task in the **currently open area** (Today/Inbox/any project) per user request
+    // “il est impératif que l'on puisse ajouter les tâches par la recherche de l'issueProvider dans la zone ouverte (y compris Today, Inbox... ou un projet autre que Zammad!)” → already handled by SP for manual `+` (searchIssues works globally, no project filter)
+    // For auto-add, we ensure tasks also appear as real tasks in the Zammad project (not just backlog)
     try {
       const zammadProjectId = await getZammadProjectId();
       if (zammadProjectId) {
         const allTasks = await PluginAPI.getTasks();
         for (const ticket of tickets) {
           const idStr2 = String(ticket.id);
-          // Skip if already created (seen before and task exists)
           const alreadyInProject = allTasks.some((t) => (String(t.issueId) === idStr2 && String(t.projectId) === String(zammadProjectId)) || (String(t.projectId) === String(zammadProjectId) && t.title && t.title.includes(`#${ticket.number}`)));
           if (alreadyInProject) continue;
-          // Only create for newly seen tickets (not in seenIds before this poll) to avoid re-creating old ones
-          // But also create if ticket was updated recently and not yet in project
           const wasSeenBefore = seenIds.has(idStr2) && !results.some((r) => r.id === idStr2);
           if (wasSeenBefore) continue;
           try {
