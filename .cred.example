@@ -4,7 +4,8 @@
 
 ZAMMAD_URL=https://zammad.example.com
 ZAMMAD_TOKEN=<your-zammad-token>
-ZAMMAD_USER_ID=3
+ZAMMAD_USER=<your-login-or-email> # e.g. nehwonlm@example.com or login
+ZAMMAD_USER_ID=3 # legacy numeric, prefer ZAMMAD_USER
 ZAMMAD_TIMEOUT=30
 ZAMMAD_INCLUDE_UPDATED=true
 ZAMMAD_POLL_INTERVAL=90000

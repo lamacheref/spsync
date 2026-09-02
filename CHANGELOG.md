@@ -5,6 +5,13 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.2] - 2026-09-02
+
+### Fixed
+- `plugin.js`: use **login/email** `<ZAMMAD_USER>` instead of numeric `USER_ID` — `configFields` now `zammadUser` (`Zammad login or email`, e.g. `nehwonlm@example.com`) + legacy `zammadUserId`; `resolveZammadUser` searches `login`/`email` via `/users/search` and falls back to `owner.email`/`owner.login` DSL; `testConnection` and `getNewIssuesForBacklog` updated; placeholders in docs now `<ZAMMAD_USER>` (login/email) not `<ZAMMAD_USER_ID>`
+- `plugin.js`: `testConnection` and `getNewIssuesForBacklog` now correctly handle login/email vs `owner_id` (was using `USER_ID` placeholder, now login per user request)
+- `i18n`: add `CFG.ZAMMAD_USER`/`_DESC` + `CFG.ZAMMAD_USER_ID_DESC` EN/FR; token field `CFG.ZAMMAD_TOKEN` already in `0.3.1`
+
 ## [0.3.1] - 2026-09-02
 
 ### Fixed

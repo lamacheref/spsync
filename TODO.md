@@ -1,11 +1,11 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 2 newly assigned ✅ DONE (`0.3.0`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 2 newly assigned ✅ DONE (`0.3.2`), see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
-- [x] Set `ZAMMAD_USER_ID` (auto via `/users/me`) in plugin config — placeholder `<ZAMMAD_USER_ID>` (real value in `.cred`)
+- [x] Set `ZAMMAD_USER` login/email (or legacy `ZAMMAD_USER_ID`) in plugin config — placeholder `<ZAMMAD_USER>` (e.g. `nehwonlm@example.com`, auto via `/users/me`, real value in `.cred`)
 - [x] Choose SP project target (handled by `issueProvider` — no `INBOX_PROJECT` needed; `persistDataSynced` for cache)
 - [x] Decide storage `lastSyncAt` + cache `ticketId→state/owner` (`persistDataSynced` + `setSecret` for token, verified in `index.html`)
 - [x] Fix `pollInterval` (90000 ms) and `ZAMMAD_TIMEOUT=30` (`zammadTimeout` advanced field, default 30000)
@@ -22,14 +22,14 @@
 ## Phase 1 — issueProvider Reading ✅ DONE (0.1.8)
 
 - [x] Wire `PluginHttp` real calls: `GET <ZAMMAD_URL>/api/v1/tickets/search?query=...` + `GET /ticket_articles/by_ticket/:id` with `Authorization: Token token=<ZAMMAD_TOKEN>` (via `getSecret`, `PluginHttp` `timeout` from `zammadTimeout`)
-- [x] Resolve `zammadUserId` via `GET /users/me` if empty, cache `owner_id:<ZAMMAD_USER_ID>` in `persistDataSynced.cachedUserId`
+- [x] Resolve `zammadUser` login/email (or `zammadUserId` legacy) via `GET /users/search` or `GET /users/me` if empty, cache `owner_id:<resolved>` + `cachedUserLogin` in `persistDataSynced`
 - [x] Map `ticket` → `PluginSearchResult` / `PluginIssue` (status `new/open/pending/closed/merged`, `assignee`, `labels` group, `lastUpdated`, `comments` via `ticket_articles`, `pendingTime`/`ownerId` extras)
 - [x] Pagination `limit 50` + `sort_by: updated_at` `order_by: desc` (`searchIssues` params)
 - [x] `testConnection` real: `GET /users/me` + `GET /ticket_states` → `showSnack(ERROR)` on fail, cache userId
 
-## Phase 2 — Use-case B: Newly Assigned ✅ DONE (0.3.0)
+## Phase 2 — Use-case B: Newly Assigned ✅ DONE (0.3.2)
 
-- [x] Query `owner_id:<ZAMMAD_USER_ID> AND state.name:new AND updated_at:>lastSyncAt` in `getNewIssuesForBacklog` (limit 50, sort `updated_at desc`, `timeField: updated_at`, fallback 7d, timeout from `zammadTimeout`)
+- [x] Query `owner_id:<resolved> (from <ZAMMAD_USER> login/email) AND state.name:new AND updated_at:>lastSyncAt` in `getNewIssuesForBacklog` (limit 50, sort `updated_at desc`, `timeField: updated_at`, fallback 7d, timeout from `zammadTimeout`)
 - [x] Detect peer assignment: `owner_id` transition `≠me → me` + `updated_by_id ≠me` (cache `ownerCache`, `_isPeerAssigned` flag, `_prevOwner`)
 - [x] Dedup via `persistDataSynced` (`seenIds` capped 500 + `ownerCache` + `lastSyncAt` ISO, `persistedDataChanged` hook)
 - [x] Create SP task `🆕 [Zammad #number] title` with link `<ZAMMAD_URL>/#ticket/zoom/<id>` (returned as `PluginSearchResult`, SP auto-adds to backlog; `showSnack` + `notify` once per poll)

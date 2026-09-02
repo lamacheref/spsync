@@ -1,7 +1,7 @@
 {
   "CFG.ZAMMAD_URL": "Zammad URL",
   "CFG.ZAMMAD_URL_DESC": "Base URL, e.g. https://zammad.example.com",
-  "CFG.ZAMMAD_USER_ID": "Zammad User ID (empty = auto /users/me)",
+  "CFG.ZAMMAD_USER_ID": "Zammad User ID (legacy)",
   "CFG.POLL_INTERVAL": "Poll interval",
   "CFG.AUTO_ADD_BACKLOG": "Auto-add new issues to backlog",
   "CFG.TIMEOUT": "Request timeout (ms)",
@@ -14,5 +14,8 @@
   "UI.STATUS": "Status",
   "UI.LOGS": "Logs",
   "CFG.ZAMMAD_TOKEN": "Zammad Token",
-  "CFG.ZAMMAD_TOKEN_DESC": "API token (Token token=…) — stored local-only via secret, also settable in Debug panel"
+  "CFG.ZAMMAD_TOKEN_DESC": "API token (Token token=…) — stored local-only via secret, also settable in Debug panel",
+  "CFG.ZAMMAD_USER": "Zammad login or email",
+  "CFG.ZAMMAD_USER_DESC": "Login or email (e.g. nehwonlm@example.com) — empty = auto /users/me",
+  "CFG.ZAMMAD_USER_ID_DESC": "Legacy numeric ID — prefer login/email above"
 }

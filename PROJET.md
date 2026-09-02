@@ -3,7 +3,7 @@
 > **Bridge Zammad → Super Productivity.** Turns Zammad tickets into Super Productivity tasks via a native `issueProvider` plugin.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.3.2-blue.svg)](VERSION)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-spsync-lightgrey.svg)](#)
 [![GitHub](https://img.shields.io/badge/GitHub-lamacheref%2Fspsync-181717.svg?logo=github)](https://github.com/lamacheref/spsync)
@@ -97,7 +97,7 @@ All checks were run live from this workstation (real credentials in `.cred`, pla
 |---|---|---|
 | `ZAMMAD_URL` | `<ZAMMAD_URL>` | ✅ `GET /api/v1/users/me` → `200`, `x-runtime ~56ms` |
 | `ZAMMAD_TOKEN` | `<ZAMMAD_TOKEN>` | ✅ `Authorization: Token token=…` valid |
-| `ZAMMAD_USER_ID` | *(empty)* | ✅ Resolved via `/users/me` → `<ZAMMAD_USER_EMAIL>` (see `.cred` for real mapping, e.g. id `3`, `role_ids [1,2,3]`) |
+| `ZAMMAD_USER` | *(empty)* | ✅ Resolved login/email `<ZAMMAD_USER>` (e.g. `nehwonlm@example.com`) via `/users/search` or `/users/me` → `<ZAMMAD_USER_EMAIL>`/id `3` (see `.cred`) |
 | `ZAMMAD_TIMEOUT` | `30` | ✅ Appropriate |
 | `ZAMMAD_INCLUDE_UPDATED` | `true` | ✅ `GET /tickets/search?query=updated_at:>…` works |
 
@@ -106,8 +106,8 @@ All checks were run live from this workstation (real credentials in `.cred`, pla
 - `GET /api/v1/ticket_states` → `new(1), open(2), pending reminder(3), closed(4), merged(5), pending close(7)`
 - `GET /api/v1/tickets/search?query=state.name:new` → 3 tickets (e.g. `#202609019400031` sample)
 - `GET /api/v1/tickets/search?query=state.name:"pending reminder"` → tickets with `pending_time: "2026-09-08T22:12:00.000Z"`, `state_id:3`
-- `GET /api/v1/tickets/search?query=owner_id:<ZAMMAD_USER_ID> AND state.name:new` → `[]` (valid DSL, just no matching ticket right now)
-- `GET /api/v1/tickets/search?query=owner_id:<ZAMMAD_USER_ID>` → ✅ 20+ tickets (e.g. `open`, owner `<ZAMMAD_USER_ID>`)
+- `GET /api/v1/tickets/search?query=owner.email:<ZAMMAD_USER> AND state.name:new` (or `owner_id:<resolved>`) → `[]` (valid DSL, just no matching ticket right now)
+- `GET /api/v1/tickets/search?query=owner_id:<resolved>` (from `<ZAMMAD_USER>`) → ✅ 20+ tickets (e.g. `open`, owner `<ZAMMAD_USER>`) — also valid `owner.email:<ZAMMAD_USER>`
 - `GET /api/v1/tickets/:id/history` → `404` (not exposed) — use `ticket_articles/by_ticket/:id` + `updated_at` cache instead
 
 **Implication:** polling required (no client webhook). “Out of waiting” = detect transition `pending reminder(3) → open(2)` where `pending_time` becomes `null` and `updated_by_id:1` (system scheduler). “Newly assigned” = `owner_id:<me> AND state:new` + `owner_id` transition `≠me → me` with `updated_by_id ≠me`.

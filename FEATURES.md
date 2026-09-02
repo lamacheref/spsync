@@ -35,7 +35,7 @@
 | # | Feature | Description | Criteria |
 |---|---|---|---|
 | F1.1 | HTTP client | Wrapper `PluginHttp`: `get(url, {params, headers})` with `Authorization: Token token=<ZAMMAD_TOKEN>` via `getHeaders`, `timeout: 30s` | `GET /tickets/search?q=state.name:new&limit=3` → 200 in <30s |
-| F1.2 | UserId resolution | If `zammadUserId` empty, `GET /users/me` → `id` (e.g. `3`) cached in `persistDataSynced` | `owner_id:<ZAMMAD_USER_ID>` used in all following queries |
+| F1.2 | User resolution | If `zammadUser` (login/email) empty, `GET /users/search` or `GET /users/me` → `id` cached in `persistDataSynced` (`cachedUserId` + `cachedUserLogin`) | `owner_id:<resolved>` (from `<ZAMMAD_USER>`) used in all following queries |
 | F1.3 | Ticket → issue mapping | `searchIssues(searchTerm, cfg, http)` maps `ticket` → `PluginSearchResult {id, title:#number title, url: /#ticket/zoom/id, status, assignee}` and `getById` → `PluginIssue {id, title, body, url, state, lastUpdated, comments}` via `ticket_articles` | Issue shown in Issue Panel with clickable Zammad link |
 | F1.4 | Issue display | `issueDisplay: [{summary link}, {state}, {assignee}, {group}, {pending_time}]`, `commentsConfig: {author:from, body, created:created_at}` | Detail panel shows non-internal articles, readable dates |
 | F1.5 | Pagination & limit | `limit=50`, `per_page` + sort `updated_at desc` | >50 tickets: 2nd page without loss |
@@ -48,8 +48,8 @@
 
 | # | Feature | Description | Criteria |
 |---|---|---|---|
-| F2.1 | Zammad query | `getNewIssuesForBacklog`: `owner_id:<ZAMMAD_USER_ID> AND state.name:new AND updated_at:>lastSyncAt` (DSL validated). If `ZAMMAD_INCLUDE_UPDATED=false`, fallback `created_at:>lastSyncAt` | New ticket assigned to `<ZAMMAD_USER_ID>` by peer → appears in < `pollInterval` |
-| F2.2 | “by a peer” detection | Compare current `owner_id` vs cached `prevOwnerId` + `updated_by_id != <ZAMMAD_USER_ID>` → `isNewlyAssignedByPeer=true` | Ticket created by self ≠ notified; re-assigned by peer = notified |
+| F2.1 | Zammad query | `getNewIssuesForBacklog`: `owner_id:<resolved> (from <ZAMMAD_USER> login/email) AND state.name:new AND updated_at:>lastSyncAt` (DSL `owner.email`/`owner.login` also supported). If `ZAMMAD_INCLUDE_UPDATED=false`, fallback `created_at:>lastSyncAt` | New ticket assigned to `<ZAMMAD_USER>` (e.g. `nehwonlm@example.com`) by peer → appears in < `pollInterval` |
+| F2.2 | “by a peer” detection | Compare current `owner_id` vs cached `prevOwnerId` + `updated_by_id != <resolved>` → `isNewlyAssignedByPeer=true` (login/email resolved to id) | Ticket created by self ≠ notified; re-assigned by peer = notified |
 | F2.3 | Deduplication | Cache `persistDataSynced: {seenIds: Set, lastSyncAt: ISO8601, ownerCache: {id→owner}}` + hook `persistedDataChanged` | Same ticket not re-added after import, even after reboot |
 | F2.4 | Import | Issue → SP task: `title: "🆕 [Zammad #number] title"`, `notes: url + excerpt`, `issueId/idProvider` linked, `issueWasUpdated` if `updated_at` bump | `Add to backlog` creates task with clickable link |
 | F2.5 | Notification | `notify({title, body})` + `showSnack(SUCCESS)` if `autoAddBacklog=false` | User alerted without spam (max 1 / poll) |

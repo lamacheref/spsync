@@ -33,6 +33,55 @@ const getTimeout = (cfg) => {
   return Number.isFinite(n) && n >= 1000 && n <= 60000 ? n : 30000;
 };
 
+// Helper: resolve login/email (or legacy numeric id) to numeric id via /users/search or /users/me
+const resolveZammadUser = async (config, http, base, timeout, cached) => {
+  // New field zammadUser (login or email) takes precedence, fallback to legacy zammadUserId
+  const rawInput = (config.zammadUser && String(config.zammadUser).trim()) || (config.zammadUserId && String(config.zammadUserId).trim()) || '';
+  if (rawInput && /^\d+$/.test(rawInput)) {
+    // numeric ID directly
+    return String(rawInput);
+  }
+  if (rawInput) {
+    // login or email → search
+    const field = rawInput.includes('@') ? 'email' : 'login';
+    try {
+      const res = await http.get(`${base}/api/v1/users/search`, { params: { query: `${field}:${rawInput}` }, timeout });
+      const list = Array.isArray(res) ? res : [];
+      if (list.length > 0 && list[0].id) {
+        const id = String(list[0].id);
+        console.log('[Zammad SPsync] resolveZammadUser', rawInput, '→', id);
+        return id;
+      }
+      // try opposite field if not found
+      const altField = field === 'email' ? 'login' : 'email';
+      try {
+        const res2 = await http.get(`${base}/api/v1/users/search`, { params: { query: `${altField}:${rawInput}` }, timeout });
+        const list2 = Array.isArray(res2) ? res2 : [];
+        if (list2.length > 0 && list2[0].id) return String(list2[0].id);
+      } catch {}
+    } catch (e) {
+      console.warn('[Zammad SPsync] resolveZammadUser search failed', e && e.message);
+    }
+    // fallback: if we couldn't resolve, return rawInput to try direct query like owner.email:xxx
+    // But for dedup we need numeric id, so we try to still use it as is for query
+    // Return rawInput prefixed to indicate direct login/email query
+    return `__login:${rawInput}`;
+  }
+  // empty → auto via /users/me (cached)
+  if (cached && cached.cachedUserId) return String(cached.cachedUserId);
+  try {
+    const me = await http.get(`${base}/api/v1/users/me`, { timeout });
+    if (me && me.id) {
+      const id = String(me.id);
+      cached.cachedUserId = id;
+      try { await PluginAPI.persistDataSynced(JSON.stringify(cached)); } catch {}
+      console.log('[Zammad SPsync] resolveZammadUser via /users/me →', id);
+      return id;
+    }
+  } catch {}
+  return '';
+};
+
 if (typeof plugin !== 'undefined' && plugin.onReady) {
   plugin.onReady(async () => {
     console.log('[Zammad SPsync] onReady — Phase 2');
@@ -59,8 +108,9 @@ if (typeof plugin !== 'undefined' && plugin.onReady) {
 PluginAPI.registerIssueProvider({
   configFields: [
     { key: 'zammadUrl', type: 'input', label: t('CFG.ZAMMAD_URL', 'Zammad URL'), description: t('CFG.ZAMMAD_URL_DESC', 'Base URL, e.g. https://zammad.example.com'), required: true, pattern: '^https?://.+' },
-    { key: 'zammadToken', type: 'password', label: t('CFG.ZAMMAD_TOKEN', 'Zammad Token'), description: t('CFG.ZAMMAD_TOKEN_DESC', 'API token (Token token=…) — stored local-only via secret, also settable in Debug panel'), required: false },
-    { key: 'zammadUserId', type: 'input', label: t('CFG.ZAMMAD_USER_ID', 'Zammad User ID (empty = auto /users/me)'), required: false, advanced: true },
+    { key: 'zammadToken', type: 'password', label: t('CFG.ZAMMAD_TOKEN', 'Zammad Token'), description: t('CFG.ZAMMAD_TOKEN_DESC', 'API token (Token token=…) — stored local-only via secret, also settable in Debug panel'), required: true },
+    { key: 'zammadUser', type: 'input', label: t('CFG.ZAMMAD_USER', 'Zammad login or email'), description: t('CFG.ZAMMAD_USER_DESC', 'Login or email (e.g. nehwonlm@example.com) — empty = auto /users/me'), required: false, placeholder: 'login or email' },
+    { key: 'zammadUserId', type: 'input', label: t('CFG.ZAMMAD_USER_ID', 'Zammad User ID (legacy)'), description: t('CFG.ZAMMAD_USER_ID_DESC', 'Legacy numeric ID — prefer login/email above'), required: false, advanced: true },
     { key: 'pollInterval', type: 'select', label: t('CFG.POLL_INTERVAL', 'Poll interval'), required: false, advanced: true, options: [{ label: '30s', value: '30000' }, { label: '90s', value: '90000' }, { label: '5 min', value: '300000' }] },
     { key: 'autoAddBacklog', type: 'checkbox', label: t('CFG.AUTO_ADD_BACKLOG', 'Auto-add new issues to backlog'), required: false, advanced: true },
     { key: 'zammadTimeout', type: 'input', label: t('CFG.TIMEOUT', 'Request timeout (ms)'), description: t('CFG.TIMEOUT_DESC', 'Timeout for Zammad API requests'), required: false, advanced: true, pattern: '^[0-9]+$' },
@@ -169,35 +219,31 @@ PluginAPI.registerIssueProvider({
     }
   },
 
-  // F2.1-F2.5: newly assigned by peer → owner_id:<me> AND state:new AND updated_at:>lastSyncAt
+  // F2.1-F2.5: newly assigned by peer → owner.login/email:<me> AND state:new AND updated_at:>lastSyncAt
   async getNewIssuesForBacklog(config, http) {
     const base = (config.zammadUrl || '').replace(/\/+$/, '');
     if (!base) return [];
     const timeout = getTimeout(config);
 
-    // F1.2 + F2.1: resolve userId (config or cached or /users/me)
-    let userId = (config.zammadUserId && String(config.zammadUserId).trim()) || '';
+    // Resolve login/email or legacy id → numeric id (placeholder <ZAMMAD_USER> → real login, see .cred)
     let cached = {};
     try {
       const raw = await PluginAPI.loadSyncedData();
       cached = raw ? JSON.parse(raw) : {};
-      if (!userId && cached.cachedUserId) userId = String(cached.cachedUserId);
     } catch {}
+    let userId = await resolveZammadUser(config, http, base, timeout, cached);
     if (!userId) {
-      try {
-        const me = await http.get(`${base}/api/v1/users/me`, { timeout });
-        if (me && me.id) {
-          userId = String(me.id);
-          cached.cachedUserId = userId;
-          try { await PluginAPI.persistDataSynced(JSON.stringify(cached)); } catch {}
-          console.log('[Zammad SPsync] resolved userId', userId);
-        }
-      } catch (e) {
-        console.warn('[Zammad SPsync] getNewIssuesForBacklog: cannot resolve userId', e && e.message);
-        return [];
-      }
+      console.warn('[Zammad SPsync] getNewIssuesForBacklog: cannot resolve user');
+      return [];
     }
-    if (!userId) return [];
+    // If resolve returned __login:xxx (search failed), use direct owner.email/login query
+    let useDirectLoginQuery = false;
+    let directLogin = '';
+    if (String(userId).startsWith('__login:')) {
+      directLogin = String(userId).slice(8);
+      useDirectLoginQuery = true;
+      console.log('[Zammad SPsync] using direct login/email query', directLogin);
+    }
 
     // F2.3: load dedup cache
     let seenIds = new Set(Array.isArray(cached.seenIds) ? cached.seenIds : []);
@@ -206,12 +252,16 @@ PluginAPI.registerIssueProvider({
     // Fallback: if lastSyncAt missing, look back 7 days to avoid flooding on first run
     if (!lastSyncAt) lastSyncAt = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-    // Build Zammad DSL query: owner_id + state:new + updated_at filter
-    // Zammad supports ISO8601 in query: updated_at:>2026-09-02T00:00:00Z
+    // Build Zammad DSL query: prefer login/email field per user request (<ZAMMAD_USER>), fallback to owner_id
     const iso = new Date(lastSyncAt).toISOString();
-    // If ZAMMAD_INCLUDE_UPDATED is false-like, SP config doesn't expose it; we use updated_at (default true per PROJET.md)
     const timeField = 'updated_at';
-    const q = `owner_id:${userId} AND state.name:new AND ${timeField}:>${iso}`;
+    let q;
+    if (useDirectLoginQuery) {
+      const field = directLogin.includes('@') ? 'owner.email' : 'owner.login';
+      q = `${field}:${directLogin} AND state.name:new AND ${timeField}:>${iso}`;
+    } else {
+      q = `owner_id:${userId} AND state.name:new AND ${timeField}:>${iso}`;
+    }
     const url = `${base}/api/v1/tickets/search`;
     console.log('[Zammad SPsync] getNewIssuesForBacklog', { userId, q, lastSyncAt: iso });
 
@@ -241,15 +291,17 @@ PluginAPI.registerIssueProvider({
         continue;
       }
 
-      // F2.2: peer detection — compare previous owner vs current
+      // F2.2: peer detection — compare previous owner vs current (supports login/email placeholder <ZAMMAD_USER>)
       const prevOwner = ownerCache[idStr];
       const curOwner = String(ticket.owner_id ?? '');
       const updatedBy = String(ticket.updated_by_id ?? '');
+      // For direct login query, effectiveUserId is the ticket's current owner (since we filtered by login)
+      const effectiveUserId = useDirectLoginQuery ? curOwner : String(userId);
       const isPeerAssigned = (
-        curOwner === String(userId) &&
+        curOwner === effectiveUserId &&
         ticket.state_id === 1 && // new
-        updatedBy !== String(userId) && // not self-assigned
-        (prevOwner === undefined || prevOwner !== String(userId)) // was not mine before
+        updatedBy !== effectiveUserId && // not self-assigned
+        (prevOwner === undefined || prevOwner !== effectiveUserId) // was not mine before
       );
       // For first-seen tickets, also consider created_by as peer hint if updated_by missing
       // If not peer-assigned, we still want to surface it but with different title (optional filter)
@@ -313,21 +365,20 @@ PluginAPI.registerIssueProvider({
     return `${base}/#ticket/zoom/${issueId}`;
   },
 
-  // F1.2: resolve userId if empty → GET /users/me, cache via persistDataSynced (F1.2)
-  // Now correctly checks token presence (was missing in config before)
+  // F1.2: resolve user (login/email <ZAMMAD_USER> or legacy id) → GET /users/me or /users/search, cache via persistDataSynced
   async testConnection(config, http) {
     const base = (config.zammadUrl || '').replace(/\/+$/, '');
     if (!base) {
       try { PluginAPI.showSnack({ msg: 'Zammad URL missing', type: 'ERROR' }); } catch {}
       return false;
     }
-    // Check token is present (via secret or config)
+    // Check token is present (via secret or config password field)
     let token = null;
     try { if (typeof PluginAPI.getSecret === 'function') token = await PluginAPI.getSecret('zammadToken'); } catch {}
     if (!token && config.zammadToken) token = String(config.zammadToken).trim();
     if (!token) {
       console.warn('[Zammad SPsync] testConnection: no token');
-      try { PluginAPI.showSnack({ msg: 'Zammad token missing — set it in config or Debug panel', type: 'ERROR' }); } catch {}
+      try { PluginAPI.showSnack({ msg: 'Zammad token missing — set it in Zammad Token field or Debug panel', type: 'ERROR' }); } catch {}
       return false;
     }
     const timeout = getTimeout(config);
@@ -335,15 +386,19 @@ PluginAPI.registerIssueProvider({
       console.log('[Zammad SPsync] testConnection →', `${base}/api/v1/users/me`);
       const me = await http.get(`${base}/api/v1/users/me`, { timeout });
       if (me && me.id) {
-        console.log('[Zammad SPsync] testConnection me.id', me.id);
-        if (!config.zammadUserId) {
+        console.log('[Zammad SPsync] testConnection me.id', me.id, 'login', me.login);
+        // Cache resolved id for Phase 2 (supports login/email placeholder)
+        const hasUserConfig = (config.zammadUser && String(config.zammadUser).trim()) || (config.zammadUserId && String(config.zammadUserId).trim());
+        if (!hasUserConfig) {
           try {
             const existing = await PluginAPI.loadSyncedData();
             const data = existing ? JSON.parse(existing) : {};
             if (!data.cachedUserId || String(data.cachedUserId) !== String(me.id)) {
               data.cachedUserId = String(me.id);
+              // Also cache login for placeholder display
+              data.cachedUserLogin = me.login || me.email || '';
               await PluginAPI.persistDataSynced(JSON.stringify(data));
-              console.log('[Zammad SPsync] cachedUserId persisted', me.id);
+              console.log('[Zammad SPsync] cachedUserId/Login persisted', me.id, data.cachedUserLogin);
             }
           } catch (cacheErr) { console.warn('[Zammad SPsync] cache userId failed', cacheErr); }
         }
