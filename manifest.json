@@ -1,7 +1,7 @@
 {
   "id": "zammad-spsync",
   "name": "Zammad SPsync",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Sync Zammad tickets (out of waiting + newly assigned) to Super Productivity",
   "manifestVersion": 1,
   "minSupVersion": "14.0.2",
@@ -18,6 +18,9 @@
   "iFrame": true,
   "icon": "icon.svg",
   "i18n": {
-    "languages": ["en", "fr"]
+    "languages": [
+      "en",
+      "fr"
+    ]
   }
 }

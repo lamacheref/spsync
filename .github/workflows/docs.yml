@@ -1,0 +1,28 @@
+name: docs-sync
+on:
+  push:
+    branches: [Dev, main]
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check VERSION vs badges
+        run: |
+          VER=$(tr -d ' \n\r' < VERSION)
+          echo "VERSION=$VER"
+          for doc in README.md PROJET.md; do
+            DVER=$(grep -oE "version-[0-9]+\.[0-9]+\.[0-9]+" "$doc" | head -1 | cut -d- -f2)
+            echo "$doc badge=$DVER"
+            if [ "$DVER" != "$VER" ]; then
+              echo "::error::$doc badge ($DVER) != VERSION ($VER)"
+              exit 1
+            fi
+          done
+          MVER=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+          echo "manifest=$MVER"
+          if [ "$MVER" != "$VER" ]; then
+            echo "::error::manifest.json ($MVER) != VERSION ($VER)"
+            exit 1
+          fi
+          echo "✅ docs synced"

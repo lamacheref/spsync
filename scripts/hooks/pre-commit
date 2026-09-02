@@ -32,4 +32,16 @@ if [[ -f manifest.json ]]; then
     exit 1
   fi
 fi
-echo "✅ VERSION $OLD_VER → $NEW_VER"
+# Vérifier badges README/PROJET synchronisés (docs à jour sur remote)
+for doc in README.md PROJET.md; do
+  if [[ -f "$doc" ]]; then
+    if grep -qE "version-[0-9]+\.[0-9]+\.[0-9]+" "$doc"; then
+      DVER=$(grep -oE "version-[0-9]+\.[0-9]+\.[0-9]+" "$doc" | head -1 | cut -d- -f2)
+      if [[ "$DVER" != "$NEW_VER" ]]; then
+        echo "❌ $doc badge ($DVER) != VERSION ($NEW_VER) — lance ./scripts/bump.sh ou corrige le badge" >&2
+        exit 1
+      fi
+    fi
+  fi
+done
+echo "✅ VERSION $OLD_VER → $NEW_VER (docs synced)"
