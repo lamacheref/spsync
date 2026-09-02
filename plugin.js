@@ -240,7 +240,7 @@ PluginAPI.registerIssueProvider({
 
   // F1.3 + F1.5: search → /tickets/search with limit 50, sort updated_at desc, handle pagination
   // Fix: search by ticket number (e.g. 202609019400031) was filtered by default new/open query.
-  // Now: never filter open (user request), only filter closed/merged.
+  // Now: never filter open (user request), only filter closed/merged. Also handle recent tickets not yet in search index (e.g. 6608).
   async searchIssues(searchTerm, config, http) {
     const base = (config.zammadUrl || '').replace(/\/+$/, '');
     if (!base) {
@@ -248,7 +248,7 @@ PluginAPI.registerIssueProvider({
       return [];
     }
     const raw = searchTerm && String(searchTerm).trim();
-    // When user types a number, Zammad full-text search on `number` works (tested 202609019400031 → 6605).
+    // When user types a number, Zammad full-text search on `number` works (tested 202609019400031 → 6605) but recent tickets (6608) may not be indexed yet.
     // We keep open visible, only exclude closed/merged per user request.
     const q = raw ? `${raw} AND NOT state.name:closed AND NOT state.name:merged` : 'NOT state.name:closed AND NOT state.name:merged';
     const url = `${base}/api/v1/tickets/search`;
@@ -257,19 +257,84 @@ PluginAPI.registerIssueProvider({
     try {
       // F1.5: limit 50, sorted by updated_at desc (Zammad DSL supports sort_by)
       const res = await http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, headers: {}, timeout });
-      const list = Array.isArray(res) ? res : (res && Array.isArray(res.assets) ? res.assets : []);
-      console.log('[Zammad SPsync] searchIssues →', list.length);
+      let list = Array.isArray(res) ? res : (res && Array.isArray(res.assets) ? res.assets : []);
+      console.log('[Zammad SPsync] searchIssues →', list.length, 'for', q);
+      // Fallback for recent tickets not yet in search index (e.g. 6608) or ticket number search
+      if (raw) {
+        const trimmed = String(raw).trim();
+        if (list.length === 0 && /^\d+$/.test(trimmed)) {
+          // Try direct fetch by id (e.g. 6608 or 202609029400038 as id fails, try as number via pagination)
+          try {
+            const direct = await http.get(`${base}/api/v1/tickets/${trimmed}`, { timeout });
+            if (direct && direct.id && String(direct.id) === trimmed) {
+              const st = Number(direct.state_id);
+              if (st !== 4 && st !== 5) {
+                console.log('[Zammad SPsync] direct fetch by id', trimmed, '→', direct.number);
+                list = [direct];
+              }
+            }
+          } catch {}
+          if (list.length === 0 && /^\d{8,}$/.test(trimmed)) {
+            // Number like 202609029400038 — scan recent pages for number match (handles index delay for 6608)
+            try {
+              for (const page of [131, 130, 132, 0]) {
+                try {
+                  const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout });
+                  const pageList = Array.isArray(pageRes) ? pageRes : [];
+                  const found = pageList.find((t) => String(t.number) === trimmed || String(t.id) === trimmed);
+                  if (found) {
+                    const st2 = Number(found.state_id);
+                    if (st2 !== 4 && st2 !== 5) {
+                      console.log('[Zammad SPsync] pagination fallback found', trimmed, '→', found.id);
+                      list = [found];
+                      break;
+                    }
+                  }
+                } catch {}
+              }
+            } catch {}
+          }
+        } else if (list.length === 0) {
+          // Title search like "Nextcloud" with index delay — try pagination title match
+          try {
+            const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: '131', per_page: '50' }, timeout });
+            const pageList = Array.isArray(pageRes) ? pageRes : [];
+            const lower = trimmed.toLowerCase();
+            const matched = pageList.filter((t) => t.title && t.title.toLowerCase().includes(lower) && Number(t.state_id) !== 4 && Number(t.state_id) !== 5);
+            if (matched.length) {
+              console.log('[Zammad SPsync] pagination title fallback', trimmed, '→', matched.length);
+              list = matched;
+            }
+          } catch {}
+        }
+      } else {
+        // No search term: default NOT closed — search index may miss very recent open tickets (e.g. 6608 created today)
+        // Supplement with recent open tickets via pagination if search missed them
+        try {
+          const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: '131', per_page: '50' }, timeout });
+          const pageList = Array.isArray(pageRes) ? pageRes : [];
+          const recentOpen = pageList.filter((t) => Number(t.state_id) === 2 || Number(t.state_id) === 1 || Number(t.state_id) === 3);
+          const existingIds = new Set(list.map((t) => String(t.id)));
+          for (const t of recentOpen) {
+            if (!existingIds.has(String(t.id))) {
+              const upd = t.updated_at ? new Date(t.updated_at).getTime() : 0;
+              if (Date.now() - upd < 7 * 24 * 60 * 60 * 1000) {
+                list.push(t);
+                console.log('[Zammad SPsync] pagination supplement added', t.id, t.number);
+              }
+            }
+            if (list.length >= 50) break;
+          }
+        } catch (e) { console.warn('[Zammad SPsync] pagination supplement failed', e && e.message); }
+      }
       return list.map((ticket) => ({
         id: String(ticket.id),
         title: `#${ticket.number} ${ticket.title}`,
         url: `${base}/#ticket/zoom/${ticket.id}`,
         status: stateToStatus(ticket.state_id),
         assignee: String(ticket.owner_id ?? ''),
-        // labels: group name if available (Phase 1.4)
         labels: ticket.group_id ? [String(ticket.group_id)] : [],
-        // for due sorting: use updated_at
         lastUpdated: ticket.updated_at ? new Date(ticket.updated_at).getTime() : undefined,
-        // expose raw for getNewIssuesForBacklog dedup later
         _raw: ticket,
       }));
     } catch (e) {

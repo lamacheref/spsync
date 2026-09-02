@@ -5,6 +5,11 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.7] - 2026-09-02
+
+### Fixed
+- `plugin.js:searchIssues`: handle **recent tickets not yet in search index** (e.g. `#202609029400038` / 6608 `open`, owner 3, created today) — search `202609029400038` returned `[]` due to Elasticsearch delay; now fallback to `GET /api/v1/tickets/:id` direct fetch + pagination scan (`page 131` recent, `number`/`id` match, `title` substring) and default `NOT closed` supplements recent `open` via pagination (tested `6608` direct fetch + pagination supplement)
+
 ## [0.3.6] - 2026-09-02
 
 ### Fixed
