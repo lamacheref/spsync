@@ -3,7 +3,7 @@
 > **Bridge Zammad → Super Productivity.** Turns Zammad tickets into Super Productivity tasks via a native `issueProvider` plugin.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](VERSION)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-spsync-lightgrey.svg)](#)
 [![GitHub](https://img.shields.io/badge/GitHub-lamacheref%2Fspsync-181717.svg?logo=github)](https://github.com/lamacheref/spsync)
@@ -251,7 +251,7 @@ See [VERSIONING.md](VERSIONING.md). Summary:
 - Work on `Dev`, releases via PR `Dev → main`. `main` is the Gitea default branch (no `master`). Hook `pre-commit` blocks commits without a bump.
 
 ```bash
-./scripts/bump.sh        # 0.1.9 → 0.1.10
+./scripts/bump.sh        # 0.3.0 → 0.3.1
 ./scripts/bump.sh minor  # → 0.2.0
 ./scripts/bump.sh major  # → 1.0.0 (PR only)
 ```

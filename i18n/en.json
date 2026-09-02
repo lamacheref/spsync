@@ -12,5 +12,7 @@
   "UI.TEST_CONNECTION": "Test connection",
   "UI.LAST_SYNC": "Last sync",
   "UI.STATUS": "Status",
-  "UI.LOGS": "Logs"
+  "UI.LOGS": "Logs",
+  "CFG.ZAMMAD_TOKEN": "Zammad Token",
+  "CFG.ZAMMAD_TOKEN_DESC": "API token (Token token=…) — stored local-only via secret, also settable in Debug panel"
 }

@@ -5,6 +5,13 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.1] - 2026-09-02
+
+### Fixed
+- `plugin.js`: config now asks for **Zammad Token** (`zammadToken` `type: password` field) — `testConnection` was failing with no token prompt; now migrates `config.zammadToken` to `setSecret('zammadToken')` (local-only) and validates token presence (401/403 snacks)
+- `plugin.js`: i18n placeholder fix — `t()` now falls back when `PluginAPI.translate` returns key itself (was showing `CFG.ZAMMAD_URL`); added `CFG.ZAMMAD_TOKEN`/`_DESC` to `i18n/en.json`+`fr.json`
+- `testConnection`: now checks `base` + `token` presence, shows `SUCCESS`/`ERROR` snack with status-specific messages
+
 ## [0.3.0] - 2026-09-02
 
 ### Added

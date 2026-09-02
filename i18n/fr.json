@@ -12,5 +12,7 @@
   "UI.TEST_CONNECTION": "Tester la connexion",
   "UI.LAST_SYNC": "Dernière synchro",
   "UI.STATUS": "Statut",
-  "UI.LOGS": "Journaux"
+  "UI.LOGS": "Journaux",
+  "CFG.ZAMMAD_TOKEN": "Token Zammad",
+  "CFG.ZAMMAD_TOKEN_DESC": "Token API (Token token=…) — stocké local-only via secret, aussi via panneau Debug"
 }

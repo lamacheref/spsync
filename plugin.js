@@ -6,7 +6,11 @@
 console.log('[Zammad SPsync] plugin.js loaded — Phase 2 (Newly Assigned)');
 
 const t = (key, fallback) => {
-  try { return PluginAPI.translate(key) || fallback; } catch { return fallback; }
+  try {
+    const v = PluginAPI.translate(key);
+    // PluginAPI.translate returns the key itself when missing — fallback to English
+    return v && v !== key ? v : fallback;
+  } catch { return fallback; }
 };
 
 // Map Zammad state_id → short status (for issueDisplay + search)
@@ -55,6 +59,7 @@ if (typeof plugin !== 'undefined' && plugin.onReady) {
 PluginAPI.registerIssueProvider({
   configFields: [
     { key: 'zammadUrl', type: 'input', label: t('CFG.ZAMMAD_URL', 'Zammad URL'), description: t('CFG.ZAMMAD_URL_DESC', 'Base URL, e.g. https://zammad.example.com'), required: true, pattern: '^https?://.+' },
+    { key: 'zammadToken', type: 'password', label: t('CFG.ZAMMAD_TOKEN', 'Zammad Token'), description: t('CFG.ZAMMAD_TOKEN_DESC', 'API token (Token token=…) — stored local-only via secret, also settable in Debug panel'), required: false },
     { key: 'zammadUserId', type: 'input', label: t('CFG.ZAMMAD_USER_ID', 'Zammad User ID (empty = auto /users/me)'), required: false, advanced: true },
     { key: 'pollInterval', type: 'select', label: t('CFG.POLL_INTERVAL', 'Poll interval'), required: false, advanced: true, options: [{ label: '30s', value: '30000' }, { label: '90s', value: '90000' }, { label: '5 min', value: '300000' }] },
     { key: 'autoAddBacklog', type: 'checkbox', label: t('CFG.AUTO_ADD_BACKLOG', 'Auto-add new issues to backlog'), required: false, advanced: true },
@@ -64,7 +69,16 @@ PluginAPI.registerIssueProvider({
   async getHeaders(config) {
     let token = null;
     try { if (typeof PluginAPI.getSecret === 'function') token = await PluginAPI.getSecret('zammadToken'); } catch {}
-    if (!token && config.zammadToken) token = config.zammadToken; // legacy migration
+    if (!token && config.zammadToken) {
+      token = String(config.zammadToken).trim();
+      // Migrate config token to local-only secret (so it doesn't stay synced)
+      if (token) {
+        try {
+          await PluginAPI.setSecret('zammadToken', token);
+          console.log('[Zammad SPsync] migrated zammadToken from config to secret');
+        } catch {}
+      }
+    }
     return token ? { Authorization: `Token token=${token}` } : {};
   },
 
@@ -300,16 +314,28 @@ PluginAPI.registerIssueProvider({
   },
 
   // F1.2: resolve userId if empty → GET /users/me, cache via persistDataSynced (F1.2)
+  // Now correctly checks token presence (was missing in config before)
   async testConnection(config, http) {
     const base = (config.zammadUrl || '').replace(/\/+$/, '');
-    if (!base) return false;
+    if (!base) {
+      try { PluginAPI.showSnack({ msg: 'Zammad URL missing', type: 'ERROR' }); } catch {}
+      return false;
+    }
+    // Check token is present (via secret or config)
+    let token = null;
+    try { if (typeof PluginAPI.getSecret === 'function') token = await PluginAPI.getSecret('zammadToken'); } catch {}
+    if (!token && config.zammadToken) token = String(config.zammadToken).trim();
+    if (!token) {
+      console.warn('[Zammad SPsync] testConnection: no token');
+      try { PluginAPI.showSnack({ msg: 'Zammad token missing — set it in config or Debug panel', type: 'ERROR' }); } catch {}
+      return false;
+    }
     const timeout = getTimeout(config);
     try {
       console.log('[Zammad SPsync] testConnection →', `${base}/api/v1/users/me`);
       const me = await http.get(`${base}/api/v1/users/me`, { timeout });
       if (me && me.id) {
         console.log('[Zammad SPsync] testConnection me.id', me.id);
-        // Cache id if not set (F1.2) — persist for Phase 2 dedup
         if (!config.zammadUserId) {
           try {
             const existing = await PluginAPI.loadSyncedData();
@@ -321,15 +347,20 @@ PluginAPI.registerIssueProvider({
             }
           } catch (cacheErr) { console.warn('[Zammad SPsync] cache userId failed', cacheErr); }
         }
-        // Also verify ticket_states reachable
         try { await http.get(`${base}/api/v1/ticket_states`, { timeout }); } catch {}
+        try { PluginAPI.showSnack({ msg: `Zammad OK — user ${me.id}`, type: 'SUCCESS' }); } catch {}
         return true;
       }
+      try { PluginAPI.showSnack({ msg: 'Zammad: unexpected response (no id)', type: 'ERROR' }); } catch {}
       return false;
     } catch (e) {
-      const msg = e && (e.message || e.status || String(e));
-      console.error('[Zammad SPsync] testConnection failed', msg);
-      try { PluginAPI.showSnack({ msg: `Zammad connection failed: ${msg}`, type: 'ERROR' }); } catch {}
+      const msg = e && (e.message || e.status || e.error || String(e));
+      const status = e && e.status;
+      console.error('[Zammad SPsync] testConnection failed', status, msg, e);
+      let userMsg = `Zammad connection failed: ${msg}`;
+      if (status === 401) userMsg = 'Zammad 401 — invalid token (check Token token=…)';
+      else if (status === 403) userMsg = 'Zammad 403 — forbidden';
+      try { PluginAPI.showSnack({ msg: userMsg, type: 'ERROR' }); } catch {}
       return false;
     }
   },
