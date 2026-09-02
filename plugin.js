@@ -33,6 +33,27 @@ const getTimeout = (cfg) => {
   return Number.isFinite(n) && n >= 1000 && n <= 60000 ? n : 30000;
 };
 
+// Helper: exponential backoff for 429/timeout (F4.1) — 401 is not retried
+const withRetry = async (fn, maxRetries = 3) => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const status = e && (e.status || e.code);
+      const msg = String((e && e.message) || '');
+      const isRetryable = status === 429 || /timeout|timed out|ETIMEDOUT/i.test(msg);
+      if (isRetryable && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+        console.warn(`[Zammad SPsync] retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`, msg);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      if (status === 401) console.error('[Zammad SPsync] 401 invalid token — check Zammad Token');
+      throw e;
+    }
+  }
+};
+
 // Helper: ensure Zammad project exists and return its id (for direct indexing, user wants tasks in "Zammad" project, not just backlog)
 const getZammadProjectId = async () => {
   try {
@@ -72,7 +93,7 @@ const resolveZammadUser = async (config, http, base, timeout, cached) => {
     // login or email → search
     const field = rawInput.includes('@') ? 'email' : 'login';
     try {
-      const res = await http.get(`${base}/api/v1/users/search`, { params: { query: `${field}:${rawInput}` }, timeout });
+      const res = await withRetry(() => http.get(`${base}/api/v1/users/search`, { params: { query: `${field}:${rawInput}` }, timeout }));
       const list = Array.isArray(res) ? res : [];
       if (list.length > 0 && list[0].id) {
         const id = String(list[0].id);
@@ -82,7 +103,7 @@ const resolveZammadUser = async (config, http, base, timeout, cached) => {
       // try opposite field if not found
       const altField = field === 'email' ? 'login' : 'email';
       try {
-        const res2 = await http.get(`${base}/api/v1/users/search`, { params: { query: `${altField}:${rawInput}` }, timeout });
+        const res2 = await withRetry(() => http.get(`${base}/api/v1/users/search`, { params: { query: `${altField}:${rawInput}` }, timeout }));
         const list2 = Array.isArray(res2) ? res2 : [];
         if (list2.length > 0 && list2[0].id) return String(list2[0].id);
       } catch {}
@@ -97,7 +118,7 @@ const resolveZammadUser = async (config, http, base, timeout, cached) => {
   // empty → auto via /users/me (cached)
   if (cached && cached.cachedUserId) return String(cached.cachedUserId);
   try {
-    const me = await http.get(`${base}/api/v1/users/me`, { timeout });
+    const me = await withRetry(() => http.get(`${base}/api/v1/users/me`, { timeout }));
     if (me && me.id) {
       const id = String(me.id);
       cached.cachedUserId = id;
@@ -282,8 +303,8 @@ PluginAPI.registerIssueProvider({
     const timeout = getTimeout(config);
     console.log('[Zammad SPsync] searchIssues', { q, timeout });
     try {
-      // F1.5: limit 50, sorted by updated_at desc (Zammad DSL supports sort_by)
-      const res = await http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, headers: {}, timeout });
+      // F1.5: limit 50, sorted by updated_at desc (Zammad DSL supports sort_by) — with retry for 429/timeout (F4.1)
+      const res = await withRetry(() => http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, headers: {}, timeout }));
       let list = Array.isArray(res) ? res : (res && Array.isArray(res.assets) ? res.assets : []);
       console.log('[Zammad SPsync] searchIssues →', list.length, 'for', q);
       // Fallback for recent tickets not yet in search index (e.g. 6608) or ticket number search
@@ -292,7 +313,7 @@ PluginAPI.registerIssueProvider({
         if (list.length === 0 && /^\d+$/.test(trimmed)) {
           // Try direct fetch by id (e.g. 6608 or 202609029400038 as id fails, try as number via pagination)
           try {
-            const direct = await http.get(`${base}/api/v1/tickets/${trimmed}`, { timeout });
+            const direct = await withRetry(() => http.get(`${base}/api/v1/tickets/${trimmed}`, { timeout }));
             if (direct && direct.id && String(direct.id) === trimmed) {
               const st = Number(direct.state_id);
               if (st !== 4 && st !== 5) {
@@ -306,7 +327,7 @@ PluginAPI.registerIssueProvider({
             try {
               for (const page of [131, 130, 132, 0]) {
                 try {
-                  const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout });
+                  const pageRes = await withRetry(() => http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout }));
                   const pageList = Array.isArray(pageRes) ? pageRes : [];
                   const found = pageList.find((t) => String(t.number) === trimmed || String(t.id) === trimmed);
                   if (found) {
@@ -324,7 +345,7 @@ PluginAPI.registerIssueProvider({
         } else if (list.length === 0) {
           // Title search like "Nextcloud" with index delay — try pagination title match
           try {
-            const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: '131', per_page: '50' }, timeout });
+            const pageRes = await withRetry(() => http.get(`${base}/api/v1/tickets`, { params: { page: '131', per_page: '50' }, timeout }));
             const pageList = Array.isArray(pageRes) ? pageRes : [];
             const lower = trimmed.toLowerCase();
             const matched = pageList.filter((t) => t.title && t.title.toLowerCase().includes(lower) && Number(t.state_id) !== 4 && Number(t.state_id) !== 5);
@@ -338,7 +359,7 @@ PluginAPI.registerIssueProvider({
         // No search term: default NOT closed — search index may miss very recent open tickets (e.g. 6608 created today)
         // Supplement with recent open tickets via pagination if search missed them
         try {
-          const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: '131', per_page: '50' }, timeout });
+          const pageRes = await withRetry(() => http.get(`${base}/api/v1/tickets`, { params: { page: '131', per_page: '50' }, timeout }));
           const pageList = Array.isArray(pageRes) ? pageRes : [];
           const recentOpen = pageList.filter((t) => Number(t.state_id) === 2 || Number(t.state_id) === 1 || Number(t.state_id) === 3);
           const existingIds = new Set(list.map((t) => String(t.id)));
@@ -380,7 +401,7 @@ PluginAPI.registerIssueProvider({
     const timeout = getTimeout(config);
     let ticket = null;
     try {
-      ticket = await http.get(`${base}/api/v1/tickets/${issueId}`, { timeout });
+      ticket = await withRetry(() => http.get(`${base}/api/v1/tickets/${issueId}`, { timeout }));
       console.log('[Zammad SPsync] getById ticket', ticket && ticket.id, ticket && ticket.number);
     } catch (e) {
       const msg = e && (e.message || e.status || String(e));
@@ -391,7 +412,7 @@ PluginAPI.registerIssueProvider({
           // Scan recent pages for number match (handles index delay for 6608)
           for (const page of [131, 130, 132, 0]) {
             try {
-              const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout });
+              const pageRes = await withRetry(() => http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout }));
               const pageList = Array.isArray(pageRes) ? pageRes : [];
               const found = pageList.find((t) => String(t.number) === String(issueId) || String(t.id) === String(issueId));
               if (found) {
@@ -407,7 +428,7 @@ PluginAPI.registerIssueProvider({
     }
     let articles = [];
     try {
-      articles = await http.get(`${base}/api/v1/ticket_articles/by_ticket/${ticket.id}`, { timeout });
+      articles = await withRetry(() => http.get(`${base}/api/v1/ticket_articles/by_ticket/${ticket.id}`, { timeout }));
     } catch (artErr) {
       console.warn('[Zammad SPsync] ticket_articles failed (non-blocking)', artErr && artErr.message);
       articles = [];
@@ -489,7 +510,7 @@ PluginAPI.registerIssueProvider({
 
     let tickets = [];
     try {
-      const res = await http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout });
+      const res = await withRetry(() => http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout }));
       tickets = Array.isArray(res) ? res : [];
       console.log('[Zammad SPsync] getNewIssuesForBacklog fetched', tickets.length);
       // Fallback for recent tickets not yet in search index (e.g. 6608 created today) — pagination scan
@@ -498,7 +519,7 @@ PluginAPI.registerIssueProvider({
         try {
           for (const page of [131, 130, 132]) {
             try {
-              const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout });
+              const pageRes = await withRetry(() => http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout }));
               const pageList = Array.isArray(pageRes) ? pageRes : [];
               const filtered = pageList.filter((t) => {
                 const st = Number(t.state_id);
@@ -629,7 +650,7 @@ PluginAPI.registerIssueProvider({
     // F3.1-F3.4: pending reminder(3) → open(2) → subtask (uses same lastSyncAt window)
     try {
       const pendingQ = `state.name:open AND ${timeField}:>${iso}`;
-      const pendingRes = await http.get(`${base}/api/v1/tickets/search`, { params: { query: pendingQ, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout });
+      const pendingRes = await withRetry(() => http.get(`${base}/api/v1/tickets/search`, { params: { query: pendingQ, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout }));
       const openTickets = Array.isArray(pendingRes) ? pendingRes : [];
       if (openTickets.length) {
         console.log('[Zammad SPsync] pending check — open tickets', openTickets.length);
@@ -668,7 +689,7 @@ PluginAPI.registerIssueProvider({
     const timeout = getTimeout(config);
     try {
       console.log('[Zammad SPsync] testConnection →', `${base}/api/v1/users/me`);
-      const me = await http.get(`${base}/api/v1/users/me`, { timeout });
+      const me = await withRetry(() => http.get(`${base}/api/v1/users/me`, { timeout }));
       if (me && me.id) {
         console.log('[Zammad SPsync] testConnection me.id', me.id, 'login', me.login);
         // Cache resolved id for Phase 2 (supports login/email placeholder)
@@ -686,7 +707,7 @@ PluginAPI.registerIssueProvider({
             }
           } catch (cacheErr) { console.warn('[Zammad SPsync] cache userId failed', cacheErr); }
         }
-        try { await http.get(`${base}/api/v1/ticket_states`, { timeout }); } catch {}
+        try { await withRetry(() => http.get(`${base}/api/v1/ticket_states`, { timeout })); } catch {}
         try { PluginAPI.showSnack({ msg: `Zammad OK — user ${me.id}`, type: 'SUCCESS' }); } catch {}
         return true;
       }

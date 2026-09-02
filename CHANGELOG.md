@@ -5,6 +5,14 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.5.0] - 2026-09-02
+
+### Added
+- **Phase 4 Hardening** (`F4.1-F4.5`): `withRetry` exponential backoff (`429`/`timeout` 3×, `401` not retried, `showSnack` on 401), `i18n` EN/FR polished (all `CFG.*` keys present, plain English labels fallback), `archive/spsync-0.5.0.zip` (15K, `manifest` at root, `node --check` + `json.tool` OK), docs auto-sync + CI already in `0.3.6`
+
+### Changed
+- Keep 3 archives `0.3.17`, `0.3.18`, `0.5.0` (pruned `0.3.16`)
+
 ## [0.3.18] - 2026-09-02
 
 ### Fixed

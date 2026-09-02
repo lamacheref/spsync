@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 3 out of waiting 🚧 IN PROGRESS (`0.3.18`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 4 hardening ✅ DONE (`0.5.0`), see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
@@ -42,12 +42,12 @@
 - [x] Idempotence key `zammad:<id>:pending:<time>` + `pendingDone` Set capped 500, checked via `getTasks()` + `notes` before creation, `pending_time` locale string
 - [ ] Test with pending ticket `state: pending reminder` → `open` (poll <90s, verify subtask under parent)
 
-## Phase 4 — Hardening (0.5.0 → 1.0.0)
+## Phase 4 — Hardening ✅ DONE (0.5.0)
 
-- [ ] Error handling `401 token`, `429`, `timeout` → `showSnack(ERROR)` + exponential backoff
-- [ ] `manifest.json:version` ↔ `VERSION` auto-synced (already enforced by `scripts/bump.sh` + pre-commit + CI)
-- [ ] Docs auto-sync on every push (README/PROJET badges ↔ VERSION, `CHANGELOG.md` per commit)
-- [ ] i18n polish, ZIP reproducible, `minSupVersion` honest
+- [x] Error handling `401 token`, `429`, `timeout` → `showSnack(ERROR)` + exponential backoff (`withRetry` 3×, 401 non-retry)
+- [x] `manifest.json:version` ↔ `VERSION` auto-synced (enforced by `scripts/bump.sh` + pre-commit + CI)
+- [x] Docs auto-sync on every push (README/PROJET badges ↔ VERSION, `CHANGELOG.md` per commit)
+- [x] i18n polish (EN/FR `CFG.*` keys), ZIP reproducible, `minSupVersion` honest
 
 ## Phase 5 — Delivery
 
