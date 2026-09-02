@@ -1,0 +1,16 @@
+{
+  "CFG.ZAMMAD_URL": "Zammad URL",
+  "CFG.ZAMMAD_URL_DESC": "Base URL, e.g. https://zammad.example.com",
+  "CFG.ZAMMAD_USER_ID": "Zammad User ID (empty = auto /users/me)",
+  "CFG.POLL_INTERVAL": "Poll interval",
+  "CFG.AUTO_ADD_BACKLOG": "Auto-add new issues to backlog",
+  "CFG.TIMEOUT": "Request timeout (ms)",
+  "CFG.TIMEOUT_DESC": "Timeout for Zammad API requests",
+  "UI.TITLE": "Zammad SPsync — Debug",
+  "UI.TOKEN_LABEL": "Zammad token (stored local-only, never synced)",
+  "UI.SAVE_TOKEN": "Save token",
+  "UI.TEST_CONNECTION": "Test connection",
+  "UI.LAST_SYNC": "Last sync",
+  "UI.STATUS": "Status",
+  "UI.LOGS": "Logs"
+}
