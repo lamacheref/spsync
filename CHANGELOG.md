@@ -5,6 +5,16 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.0] - 2026-09-02
+
+### Added
+- **Phase 2 Newly Assigned** (`F2.1-F2.5`): `plugin.js:getNewIssuesForBacklog` real — `owner_id:<ZAMMAD_USER_ID> AND state.name:new AND updated_at:>lastSyncAt` (ISO, limit 50, sort `updated_at desc`, `timeout` from `zammadTimeout`, fallback 7d), peer detection `ownerCache` + `updated_by_id ≠me` → `_isPeerAssigned`/`_prevOwner`, dedup `persistDataSynced` (`seenIds` capped 500 + `ownerCache` + `lastSyncAt` ISO) + `PERSISTED_DATA_CHANGED` hook, `🆕 #number title`, `showSnack` + `notify` once per poll
+- **Phase 1 Reading** consolidated (was `0.1.8`): `searchIssues`/`getById`/`testConnection` + `issueDisplay`/`commentsConfig` (now part of `0.3.0` package)
+- Build: `spsync-0.3.0.zip` (`manifest.json` at root, `i18n` EN/FR, `icon.svg`, no CDN assets) — installable via `Settings → Plugins → Choose Plugin File`
+
+### Changed
+- Version jump `0.1.9 → 0.3.0` (minor, Phase 2 delivery per `FEATURES.md:45`), `TODO.md` Phase 2 ✅ DONE
+
 ## [0.1.9] - 2026-09-02
 
 ### Added
