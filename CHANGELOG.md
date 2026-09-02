@@ -5,6 +5,11 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.8] - 2026-09-02
+
+### Changed
+- Keep 3 archives only: `archive/` now `spsync-0.3.6.zip` (12K), `0.3.7.zip` (13K), `0.3.8.zip` (13K) — deleted `0.3.0-0.3.5` (still available as Gitea Releases assets + tags `0.3.0-0.3.5`); `!archive/*.zip` exception kept
+
 ## [0.3.7] - 2026-09-02
 
 ### Fixed
