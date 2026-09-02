@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 2 newly assigned ✅ DONE (`0.3.2`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 2 newly assigned ✅ DONE (`0.3.3`), see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
@@ -27,7 +27,7 @@
 - [x] Pagination `limit 50` + `sort_by: updated_at` `order_by: desc` (`searchIssues` params)
 - [x] `testConnection` real: `GET /users/me` + `GET /ticket_states` → `showSnack(ERROR)` on fail, cache userId
 
-## Phase 2 — Use-case B: Newly Assigned ✅ DONE (0.3.2)
+## Phase 2 — Use-case B: Newly Assigned ✅ DONE (0.3.3)
 
 - [x] Query `owner_id:<resolved> (from <ZAMMAD_USER> login/email) AND state.name:new AND updated_at:>lastSyncAt` in `getNewIssuesForBacklog` (limit 50, sort `updated_at desc`, `timeField: updated_at`, fallback 7d, timeout from `zammadTimeout`)
 - [x] Detect peer assignment: `owner_id` transition `≠me → me` + `updated_by_id ≠me` (cache `ownerCache`, `_isPeerAssigned` flag, `_prevOwner`)

@@ -5,6 +5,14 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.3] - 2026-09-02
+
+### Added
+- Archive: `archive/spsync-0.3.0.zip` (8.9K), `0.3.1.zip` (9.4K), `0.3.2.zip` (11K) + build `0.3.3.zip` (11K, 6 files, `manifest.json` at root, `!archive/*.zip` exception to `.gitignore:*.zip`), `spsync-0.3.2.zip` ready for `tag 0.3.2` release
+
+### Changed
+- Docs: `TODO.md` last update → `0.3.3`, `PROJET.md`/`README.md` badges already `0.3.3` via `scripts/bump.sh`
+
 ## [0.3.2] - 2026-09-02
 
 ### Fixed
