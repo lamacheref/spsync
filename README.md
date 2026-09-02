@@ -3,7 +3,7 @@
 > **Zammad → Super Productivity.** A native `issueProvider` plugin that turns your Zammad tickets into Super Productivity tasks — right where you work.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.6-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.7-blue.svg)](VERSION)
 [![Manifest](https://img.shields.io/badge/manifest-issueProvider-9cf.svg)](manifest.json)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-Dev-lightgrey.svg)](#)
@@ -31,6 +31,7 @@
 - [Features at a Glance](#features-at-a-glance)
 - [Project Structure](#project-structure)
 - [Development](#development)
+- [Changelog](#changelog)
 - [Versioning & Branching](#versioning--branching)
 - [Security](#security)
 - [Publishing](#publishing)
@@ -145,7 +146,7 @@ spsync/
 ├── FEATURES.md     # features by phase + post-v1
 ├── TODO.md         # checklist
 ├── ROADMAP.md      # milestones
-├── VERSION         # source of truth M.m.f (0.1.6)
+├── VERSION         # source of truth M.m.f (0.1.7)
 ├── VERSIONING.md   # M.m.f tooling
 ├── CHANGELOG.md    # per-release notes
 ├── manifest.json   # PluginManifest (issueProvider ZAMMAD 0.1.3)
@@ -177,7 +178,7 @@ cp .cred.example .cred   # fill real values
 
 # code
 # bump version on EVERY commit (hook enforces it)
-./scripts/bump.sh        # patch → 0.1.5 → 0.1.6
+./scripts/bump.sh        # patch → 0.1.6 → 0.1.7
 ./scripts/bump.sh minor  # feature → 0.2.0
 # major only via user PR: ./scripts/bump.sh major
 
@@ -195,6 +196,10 @@ zip -r spsync.zip manifest.json plugin.js icon.svg
 - Inline CSS/JS in `index.html` if you add an iframe; use SP theme vars (`--c-primary`, `--card-bg`, …)
 
 ---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) — updated on every commit (`M.m.f` + Keep a Changelog). Badges in this README and [PROJET.md](PROJET.md) are auto-synced via `scripts/bump.sh` + pre-commit hook + CI.
 
 ## Versioning & Branching
 
