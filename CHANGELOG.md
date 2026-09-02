@@ -5,6 +5,31 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.18] - 2026-09-02
+
+### Fixed
+- `plugin.js:searchIssues` + `getById` now truly global — `+` from any open area (Today/Inbox/Zammad/other) creates task **in that area** (SP's current work context), not only Zammad; previous `0.3.17` already had global search (`NOT closed`) but `+` still failed for some due to missing `projectId` handling — now verified `6608` via direct fetch in any context
+
+## [0.3.17] - 2026-09-02
+
+### Fixed
+- `plugin.js`: `+` in **any open area** (Today/Inbox/project ≠ Zammad) now works — `searchIssues` is global (no project filter, `NOT closed` only) and `getById` is now robust for `+` click (direct `GET /tickets/:id` + pagination fallback for `number`/`title`, e.g. `6608`/`202609029400038` even when not yet indexed); SP creates the task **in the currently open folder** (Today/Inbox/selected project) as requested, not only in Zammad
+
+## [0.3.16] - 2026-09-02
+
+### Fixed
+- `plugin.js`: plain English labels (was `t('CFG.ZAMMAD_URL',…)`) now `'Zammad URL'` etc., keep `open` visible, `defaultAutoAddToBacklog: true→false` already in `0.3.13`, archive kept 3
+
+## [0.3.15] - 2026-09-02
+
+### Added
+- Archive `spsync-0.3.15.zip` etc.
+
+## [0.3.14] - 2026-09-02
+
+### Changed
+- Keep 3 archives
+
 ## [0.3.13] - 2026-09-02
 
 ### Changed
