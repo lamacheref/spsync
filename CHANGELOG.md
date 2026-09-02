@@ -5,6 +5,12 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.4] - 2026-09-02
+
+### Fixed
+- `plugin.js`: use **plain English labels** in `configFields` (was `t('CFG.ZAMMAD_URL',…)`, now `'Zammad URL'` etc.) to eliminate i18n placeholders `CFG.ZAMMAD_URL` when `PluginAPI.translate` not ready at `registerIssueProvider` time; `i18n/en.json`+`fr.json` kept for `index.html` and future host translation (per `docs/plugin-development.md` § i18n). Labels now show correctly without needing translate.
+- Verified `archive/spsync-0.3.3.zip` was built from **old** `0.3.2` code (hence token field invisible for user) — rebuilt as `0.3.4` from `0.3.3` with correct `zammadToken` (password, `required: true`) + `zammadUser` login/email
+
 ## [0.3.3] - 2026-09-02
 
 ### Added

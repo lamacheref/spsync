@@ -107,13 +107,13 @@ if (typeof plugin !== 'undefined' && plugin.onReady) {
 
 PluginAPI.registerIssueProvider({
   configFields: [
-    { key: 'zammadUrl', type: 'input', label: t('CFG.ZAMMAD_URL', 'Zammad URL'), description: t('CFG.ZAMMAD_URL_DESC', 'Base URL, e.g. https://zammad.example.com'), required: true, pattern: '^https?://.+' },
-    { key: 'zammadToken', type: 'password', label: t('CFG.ZAMMAD_TOKEN', 'Zammad Token'), description: t('CFG.ZAMMAD_TOKEN_DESC', 'API token (Token token=…) — stored local-only via secret, also settable in Debug panel'), required: true },
-    { key: 'zammadUser', type: 'input', label: t('CFG.ZAMMAD_USER', 'Zammad login or email'), description: t('CFG.ZAMMAD_USER_DESC', 'Login or email (e.g. nehwonlm@example.com) — empty = auto /users/me'), required: false, placeholder: 'login or email' },
-    { key: 'zammadUserId', type: 'input', label: t('CFG.ZAMMAD_USER_ID', 'Zammad User ID (legacy)'), description: t('CFG.ZAMMAD_USER_ID_DESC', 'Legacy numeric ID — prefer login/email above'), required: false, advanced: true },
-    { key: 'pollInterval', type: 'select', label: t('CFG.POLL_INTERVAL', 'Poll interval'), required: false, advanced: true, options: [{ label: '30s', value: '30000' }, { label: '90s', value: '90000' }, { label: '5 min', value: '300000' }] },
-    { key: 'autoAddBacklog', type: 'checkbox', label: t('CFG.AUTO_ADD_BACKLOG', 'Auto-add new issues to backlog'), required: false, advanced: true },
-    { key: 'zammadTimeout', type: 'input', label: t('CFG.TIMEOUT', 'Request timeout (ms)'), description: t('CFG.TIMEOUT_DESC', 'Timeout for Zammad API requests'), required: false, advanced: true, pattern: '^[0-9]+$' },
+    { key: 'zammadUrl', type: 'input', label: 'Zammad URL', description: 'Base URL, e.g. https://zammad.example.com', required: true, pattern: '^https?://.+' },
+    { key: 'zammadToken', type: 'password', label: 'Zammad Token', description: 'API token (Token token=…) — stored local-only, also settable in Debug panel', required: true },
+    { key: 'zammadUser', type: 'input', label: 'Zammad login or email', description: 'Login or email (e.g. nehwonlm@example.com) — empty = auto /users/me', required: false, placeholder: 'login or email' },
+    { key: 'zammadUserId', type: 'input', label: 'Zammad User ID (legacy)', description: 'Legacy numeric ID — prefer login/email above', required: false, advanced: true },
+    { key: 'pollInterval', type: 'select', label: 'Poll interval', required: false, advanced: true, options: [{ label: '30s', value: '30000' }, { label: '90s', value: '90000' }, { label: '5 min', value: '300000' }] },
+    { key: 'autoAddBacklog', type: 'checkbox', label: 'Auto-add new issues to backlog', required: false, advanced: true },
+    { key: 'zammadTimeout', type: 'input', label: 'Request timeout (ms)', description: 'Timeout for Zammad API requests', required: false, advanced: true, pattern: '^[0-9]+$' },
   ],
 
   async getHeaders(config) {
