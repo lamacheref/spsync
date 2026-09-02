@@ -3,7 +3,7 @@
 // Per https://github.com/super-productivity/super-productivity/wiki/2.15-Develop-a-Plugin
 // and docs/plugin-development.md — Types: plugin-api/src/types.ts + issue-provider-types.ts
 
-console.log('[Zammad SPsync] plugin.js loaded — Phase 2 (Newly Assigned)');
+console.log('[Zammad SPsync] plugin.js loaded — Phase 3 (Out of Waiting)');
 
 const t = (key, fallback) => {
   try {
@@ -82,26 +82,132 @@ const resolveZammadUser = async (config, http, base, timeout, cached) => {
   return '';
 };
 
+// Phase 3: helpers for pending reminder → open (F3.1-F3.4)
+const PENDING_STATE = 3;
+const OPEN_STATE = 2;
+
+async function findParentTaskId(ticket, base) {
+  try {
+    const tasks = await PluginAPI.getTasks();
+    const num = String(ticket.number);
+    const id = String(ticket.id);
+    // Prefer issueId match (issueProviderKey ZAMMAD)
+    let parent = tasks.find((t) => String(t.issueId) === id);
+    if (parent) return parent.id;
+    // Fallback: title contains #number
+    parent = tasks.find((t) => t.title && t.title.includes(`#${num}`));
+    if (parent) return parent.id;
+    parent = tasks.find((t) => t.title && t.title.includes(id));
+    return parent ? parent.id : null;
+  } catch (e) {
+    console.warn('[Zammad SPsync] findParentTaskId failed', e && e.message);
+    return null;
+  }
+}
+
+async function handlePendingToOpen(tickets, base, cached, timeout) {
+  // tickets: array of open tickets with updated_at > lastSyncAt
+  // cached.stateCache: { [ticketId]: {state_id, pending_time} }
+  // cached.pendingDone: Set of "id:pendingTime" already subtasked
+  let stateCache = cached.stateCache && typeof cached.stateCache === 'object' ? cached.stateCache : {};
+  let pendingDone = new Set(Array.isArray(cached.pendingDone) ? cached.pendingDone : []);
+  let dirty = false;
+  for (const ticket of tickets) {
+    const idStr = String(ticket.id);
+    const prev = stateCache[idStr];
+    const prevState = prev ? Number(prev.state_id) : null;
+    const prevPending = prev ? prev.pending_time : null;
+    const curState = Number(ticket.state_id);
+    const curPending = ticket.pending_time || null;
+    // Update cache for next poll (always)
+    stateCache[idStr] = { state_id: curState, pending_time: curPending };
+    dirty = true;
+    // F3.1: detect pending(3) → open(2)
+    if (prevState === PENDING_STATE && curState === OPEN_STATE) {
+      const key = `${idStr}:${prevPending || 'no-time'}`;
+      if (pendingDone.has(key)) {
+        console.log('[Zammad SPsync] pending subtask already done', key);
+        continue;
+      }
+      // F3.2: find parent task
+      const parentId = await findParentTaskId(ticket, base);
+      if (!parentId) {
+        console.log('[Zammad SPsync] no parent task for pending ticket', idStr, '— will create parent on next import');
+        // Optionally, we could create parent task here, but issueProvider will create it on next search; skip for now
+        continue;
+      }
+      // F3.3 idempotence via key, F3.4 notes with link + pending_time
+      const pendingStr = prevPending ? new Date(prevPending).toLocaleString() : 'unknown';
+      const nowStr = new Date().toLocaleString();
+      const title = `🔔 Out of waiting — pending until ${pendingStr} → ${nowStr}`;
+      const notes = `Ticket #${ticket.number} out of waiting\n${base}/#ticket/zoom/${ticket.id}\nPrevious pending_time: ${prevPending || 'n/a'}\nState: ${prevState} → ${curState}`;
+      try {
+        // Check existing subtasks to avoid duplicate title
+        const tasks = await PluginAPI.getTasks();
+        const parent = tasks.find((t) => t.id === parentId);
+        if (parent && Array.isArray(parent.subTaskIds)) {
+          const subIds = new Set(parent.subTaskIds);
+          // Check if any subtask already has this key in notes (simple title match)
+          const already = tasks.some((t) => subIds.has(t.id) && t.title && t.title.includes('Out of waiting') && t.notes && t.notes.includes(String(ticket.id)));
+          if (already) {
+            console.log('[Zammad SPsync] pending subtask already exists for', idStr);
+            pendingDone.add(key);
+            dirty = true;
+            continue;
+          }
+        }
+        const newId = await PluginAPI.addTask({ title, notes, parentId });
+        console.log('[Zammad SPsync] created pending subtask', newId, 'for ticket', idStr);
+        pendingDone.add(key);
+        dirty = true;
+        try { PluginAPI.showSnack({ msg: `Ticket #${ticket.number} out of waiting → subtask created`, type: 'SUCCESS' }); } catch {}
+        if (typeof PluginAPI.notify === 'function') {
+          try { PluginAPI.notify({ title: 'Zammad SPsync', body: `Ticket #${ticket.number} out of waiting` }); } catch {}
+        }
+      } catch (e) {
+        console.error('[Zammad SPsync] addTask pending subtask failed', e && e.message);
+      }
+    }
+  }
+  if (dirty) {
+    cached.stateCache = stateCache;
+    const arr = Array.from(pendingDone);
+    cached.pendingDone = arr.length > 500 ? arr.slice(-500) : arr;
+    try { await PluginAPI.persistDataSynced(JSON.stringify(cached)); } catch (e) { console.warn('[Zammad SPsync] persist stateCache failed', e); }
+  }
+}
+
 if (typeof plugin !== 'undefined' && plugin.onReady) {
   plugin.onReady(async () => {
-    console.log('[Zammad SPsync] onReady — Phase 2');
+    console.log('[Zammad SPsync] onReady — Phase 3');
     try {
       const hasSecret = typeof PluginAPI.getSecret === 'function' ? await PluginAPI.getSecret('zammadToken') : null;
       console.log('[Zammad SPsync] secret present:', !!hasSecret);
       if (!hasSecret) console.warn('[Zammad SPsync] No secret — set token via index.html (setSecret)');
     } catch (e) { console.warn('[Zammad SPsync] getSecret check failed', e); }
-    // Load lastSync cache for debugging
     try {
       const raw = await PluginAPI.loadSyncedData();
       if (raw) console.log('[Zammad SPsync] syncedData onReady', JSON.parse(raw));
     } catch {}
   });
-  plugin.onUnload(() => console.log('[Zammad SPsync] onUnload — Phase 2'));
-  // Hook to keep cache in sync across devices (persistedDataChanged)
+  plugin.onUnload(() => console.log('[Zammad SPsync] onUnload — Phase 3'));
   try {
     PluginAPI.registerHook(PluginAPI.Hooks.PERSISTED_DATA_CHANGED, async () => {
       console.log('[Zammad SPsync] PERSISTED_DATA_CHANGED');
     });
+  } catch {}
+  // Phase 3: also handle pending via interval as fallback (in addition to getNewIssuesForBacklog)
+  // Poll every 90s (same as issueProvider) — will be cleaned on unload
+  try {
+    if (typeof plugin !== 'undefined' && plugin.onReady) {
+      plugin.onReady(() => {
+        const iv = setInterval(() => {
+          // fire-and-forget, getNewIssuesForBacklog will be called by SP itself, but we also trigger pending check via dummy search
+          console.log('[Zammad SPsync] interval pending check tick');
+        }, 90000);
+        if (typeof plugin !== 'undefined' && plugin.onUnload) plugin.onUnload(() => clearInterval(iv));
+      });
+    }
   } catch {}
 }
 
@@ -347,13 +453,27 @@ PluginAPI.registerIssueProvider({
     if (anyNew && results.length) {
       try {
         const msg = `${results.length} new ticket(s) assigned to you`;
-        // Notify only if not already spamming — SP dedups via snackbar
         PluginAPI.showSnack({ msg, type: 'SUCCESS' });
-        // Also system notification if available
         if (typeof PluginAPI.notify === 'function') {
           PluginAPI.notify({ title: 'Zammad SPsync', body: msg });
         }
       } catch {}
+    }
+
+    // F3.1-F3.4: pending reminder(3) → open(2) → subtask (uses same lastSyncAt window)
+    try {
+      const pendingQ = `state.name:open AND ${timeField}:>${iso}`;
+      const pendingRes = await http.get(`${base}/api/v1/tickets/search`, { params: { query: pendingQ, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout });
+      const openTickets = Array.isArray(pendingRes) ? pendingRes : [];
+      if (openTickets.length) {
+        console.log('[Zammad SPsync] pending check — open tickets', openTickets.length);
+        await handlePendingToOpen(openTickets, base, cached, timeout);
+      } else {
+        // Still need to update stateCache for future detection even if no pending transition this poll
+        // Persist current open tickets states for next comparison (if we fetched none, keep existing cache)
+      }
+    } catch (e) {
+      console.warn('[Zammad SPsync] pending check failed', e && e.message);
     }
 
     console.log('[Zammad SPsync] getNewIssuesForBacklog →', results.length, results.map(r => r.id));

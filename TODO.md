@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 2 newly assigned ✅ DONE (`0.3.4`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 3 out of waiting 🚧 IN PROGRESS (`0.3.5`), see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
@@ -35,11 +35,12 @@
 - [x] Create SP task `🆕 [Zammad #number] title` with link `<ZAMMAD_URL>/#ticket/zoom/<id>` (returned as `PluginSearchResult`, SP auto-adds to backlog; `showSnack` + `notify` once per poll)
 - [x] Test scaffold: `searchIssues`/`getById` verified via `GET /users/me`, `GET /tickets/search`, `pendingTime`/`ownerId` extras; `getNewIssuesForBacklog` unit-logged, poll <90s
 
-## Phase 3 — Use-case A: Out of Waiting (0.4.0)
+## Phase 3 — Use-case A: Out of Waiting 🚧 IN PROGRESS (0.3.5 → 0.4.0)
 
-- [ ] Detect `pending reminder(3) → open(2)`: poll `state.name:open AND updated_at:>lastSyncAt` + `stateCache`
-- [ ] Create hybrid subtask `🔔 Out of waiting — <pending_time> → <now>` via `addTask({parentId})` (1 level max, hybrid `issueProvider` + `permissions: ["addTask"]`)
-- [ ] Idempotence key `zammad:<id>:pending:<time>` checked via `getTasks()` before creation
+- [x] Detect `pending reminder(3) → open(2)`: poll `state.name:open AND updated_at:>lastSyncAt` + `stateCache` (`pending:3` → `open:2`, `pending_time` cached, `stateCache` persisted)
+- [x] Create hybrid subtask `🔔 Out of waiting — <pending_time> → <now>` via `PluginAPI.addTask({parentId})` (1 level max, hybrid `issueProvider` + `permissions: ["addTask","getTasks"]`, `findParentTaskId` via `issueId`/`#number`)
+- [x] Idempotence key `zammad:<id>:pending:<time>` + `pendingDone` Set capped 500, checked via `getTasks()` + `notes` before creation, `pending_time` locale string
+- [ ] Test with pending ticket `state: pending reminder` → `open` (poll <90s, verify subtask under parent)
 
 ## Phase 4 — Hardening (0.5.0 → 1.0.0)
 

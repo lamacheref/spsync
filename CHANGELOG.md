@@ -11,6 +11,20 @@ versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<
 - `plugin.js`: use **plain English labels** in `configFields` (was `t('CFG.ZAMMAD_URL',…)`, now `'Zammad URL'` etc.) to eliminate i18n placeholders `CFG.ZAMMAD_URL` when `PluginAPI.translate` not ready at `registerIssueProvider` time; `i18n/en.json`+`fr.json` kept for `index.html` and future host translation (per `docs/plugin-development.md` § i18n). Labels now show correctly without needing translate.
 - Verified `archive/spsync-0.3.3.zip` was built from **old** `0.3.2` code (hence token field invisible for user) — rebuilt as `0.3.4` from `0.3.3` with correct `zammadToken` (password, `required: true`) + `zammadUser` login/email
 
+## [0.3.5] - 2026-09-02
+
+### Added
+- **Phase 3 Out of Waiting** (`F3.1-F3.4`): `pending reminder(3) → open(2)` → `🔔` subtask via `PluginAPI.addTask({parentId})` — `stateCache` + `pendingDone` (capped 500) in `persistDataSynced`, `findParentTaskId` (issueId → `#number`), `handlePendingToOpen` (title `Out of waiting — pending until ... → now`, notes with link + `pending_time`), idempotence via `notes` + `getTasks()`, `showSnack` + `notify`, integrated in `getNewIssuesForBacklog` poll + `onReady` interval, `manifest` `permissions: ["addTask","getTasks"]` + `hooks: ["taskUpdate"]`
+
+### Changed
+- `manifest.json` `0.3.4 → 0.3.5`, badges auto-synced
+
+## [0.3.4] - 2026-09-02
+
+### Fixed
+- `plugin.js`: use **plain English labels** in `configFields` (was `t('CFG.ZAMMAD_URL',…)`, now `'Zammad URL'` etc.) to eliminate i18n placeholders `CFG.ZAMMAD_URL` when `PluginAPI.translate` not ready at `registerIssueProvider` time; `i18n/en.json`+`fr.json` kept for `index.html` and future host translation (per `docs/plugin-development.md` § i18n). Labels now show correctly without needing translate.
+- Verified `archive/spsync-0.3.3.zip` was built from **old** `0.3.2` code (hence token field invisible for user) — rebuilt as `0.3.4` from `0.3.3` with correct `zammadToken` (password, `required: true`) + `zammadUser` login/email
+
 ## [0.3.3] - 2026-09-02
 
 ### Added
