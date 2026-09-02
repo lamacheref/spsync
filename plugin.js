@@ -33,6 +33,33 @@ const getTimeout = (cfg) => {
   return Number.isFinite(n) && n >= 1000 && n <= 60000 ? n : 30000;
 };
 
+// Helper: ensure Zammad project exists and return its id (for direct indexing, user wants tasks in "Zammad" project, not just backlog)
+const getZammadProjectId = async () => {
+  try {
+    const projects = await PluginAPI.getAllProjects();
+    let proj = projects.find((p) => p.title === 'Zammad' || String(p.title).toLowerCase() === 'zammad');
+    if (proj) return proj.id;
+    // Try to create if not exists (requires getAllProjects/addProject permission)
+    try {
+      const newId = await PluginAPI.addProject({ title: 'Zammad' });
+      console.log('[Zammad SPsync] created Zammad project', newId);
+      // addProject may return id or project; handle both
+      if (typeof newId === 'string' && newId) return newId;
+      if (newId && typeof newId === 'object' && newId.id) return String(newId.id);
+      // Fallback: refetch
+      const all2 = await PluginAPI.getAllProjects();
+      const found = all2.find((p) => p.title === 'Zammad');
+      return found ? found.id : null;
+    } catch (e) {
+      console.warn('[Zammad SPsync] addProject Zammad failed', e && e.message);
+      return null;
+    }
+  } catch (e) {
+    console.warn('[Zammad SPsync] getAllProjects failed', e && e.message);
+    return null;
+  }
+};
+
 // Helper: resolve login/email (or legacy numeric id) to numeric id via /users/search or /users/me
 const resolveZammadUser = async (config, http, base, timeout, cached) => {
   // New field zammadUser (login or email) takes precedence, fallback to legacy zammadUserId
@@ -542,14 +569,41 @@ PluginAPI.registerIssueProvider({
         status: stateToStatus(ticket.state_id),
         assignee: curOwner,
         labels: ticket.group_id ? [String(ticket.group_id)] : [],
-        // Keep raw for debugging / future pending logic
         _isPeerAssigned: isPeer,
         _updatedBy: updatedBy,
         _prevOwner: prevOwner,
       });
+    }
 
-      // F2.5: optional notify — SP will auto-add to backlog if enabled; we also snack for visibility when not auto
-      // We limit to one snack per poll to avoid spam
+    // Directly index in dedicated "Zammad" project (user wants tasks there, not just backlog) — handles backlog empty / disabled
+    // This ensures tasks appear in the Zammad project's task list even if backlog is not visible
+    try {
+      const zammadProjectId = await getZammadProjectId();
+      if (zammadProjectId) {
+        const allTasks = await PluginAPI.getTasks();
+        for (const ticket of tickets) {
+          const idStr2 = String(ticket.id);
+          // Skip if already created (seen before and task exists)
+          const alreadyInProject = allTasks.some((t) => (String(t.issueId) === idStr2 && String(t.projectId) === String(zammadProjectId)) || (String(t.projectId) === String(zammadProjectId) && t.title && t.title.includes(`#${ticket.number}`)));
+          if (alreadyInProject) continue;
+          // Only create for newly seen tickets (not in seenIds before this poll) to avoid re-creating old ones
+          // But also create if ticket was updated recently and not yet in project
+          const wasSeenBefore = seenIds.has(idStr2) && !results.some((r) => r.id === idStr2);
+          if (wasSeenBefore) continue;
+          try {
+            const tTitle = `🆕 #${ticket.number} ${ticket.title}`;
+            const tNotes = `${base}/#ticket/zoom/${ticket.id}\nState: ${stateToStatus(ticket.state_id)} — Owner: ${ticket.owner_id}\nCreated: ${ticket.created_at || ''}`;
+            const newTaskId = await PluginAPI.addTask({ title: tTitle, notes: tNotes, projectId: zammadProjectId });
+            console.log('[Zammad SPsync] created Zammad project task', newTaskId, 'for ticket', idStr2);
+          } catch (e) {
+            console.warn('[Zammad SPsync] addTask to Zammad project failed for', idStr2, e && e.message);
+          }
+        }
+      } else {
+        console.warn('[Zammad SPsync] no Zammad project id — skip direct indexing');
+      }
+    } catch (e) {
+      console.warn('[Zammad SPsync] Zammad project direct indexing failed', e && e.message);
     }
 
     // F2.3: persist dedup + lastSyncAt
