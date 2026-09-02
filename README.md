@@ -3,7 +3,7 @@
 > **Zammad → Super Productivity.** A native `issueProvider` plugin that turns your Zammad tickets into Super Productivity tasks — right where you work.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](VERSION)
 [![Manifest](https://img.shields.io/badge/manifest-issueProvider-9cf.svg)](manifest.json)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-Dev-lightgrey.svg)](#)

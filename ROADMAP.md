@@ -30,14 +30,13 @@ Zammad → Super Productivity connector (issueProvider): automatically surface r
 - Subtask `🔔 Out of waiting` under parent ticket task
 - Exit: pending ticket expiry → subtask created
 
-### M4 — Hardening (Week 3)
-- Pagination, errors, backoff, `manifest.json:version` ↔ `VERSION`
-- Tests + install docs, i18n if needed
-- Exit: 7 days without duplication/loss
+### M4 — Hardening ✅ DONE (0.5.0)
+- Pagination, `withRetry` backoff (429/timeout), i18n EN/FR, docs auto-sync + CI
 
-### M5 — Release (Week 3-4)
-- Gitea Release `vM.m.f` from `main`, ZIP asset, `CHANGELOG.md`
-- Candidate for community list (Reddit / GitHub Discussions)
+### M5 — Release ✅ DONE (1.0.0-rc1)
+- Bump `M` via PR utilisateur → **`1.0.0-rc1`** (tag pré-release, Gitea pre-release + GitHub tag, `archive/spsync-1.0.0-rc1.zip`)
+- `CHANGELOG.md` complet, docs à jour
+- Next : **7 j d'observation RC** → si verts → tag final **`v1.0.0`** + candidature communauté (Reddit / GitHub Discussions)
 
 ## Risks
 

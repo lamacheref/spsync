@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 4 hardening ✅ DONE (`0.5.0`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 5 delivery ✅ DONE (`1.0.0-rc1`), voir [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
@@ -49,11 +49,12 @@
 - [x] Docs auto-sync on every push (README/PROJET badges ↔ VERSION, `CHANGELOG.md` per commit)
 - [x] i18n polish (EN/FR `CFG.*` keys), ZIP reproducible, `minSupVersion` honest
 
-## Phase 5 — Delivery
+## Phase 5 — Delivery ✅ DONE (1.0.0-rc1)
 
-- [ ] `CHANGELOG.md` + Gitea/GitHub Releases (`<GITEA_URL>` ↔ `git@github.com:lamacheref/spsync.git`, dual push)
-- [ ] Docs updated (`PROJET.md`, `FEATURES.md` checkmarks, [CHANGELOG.md](CHANGELOG.md) per version)
-- [ ] ZIP reproducible, `minSupVersion` honest
+- [x] `CHANGELOG.md` + Gitea/GitHub Releases (`<GITEA_URL>` ↔ `git@github.com:lamacheref/spsync.git`, dual push)
+- [x] Docs updated (`PROJET.md`, `FEATURES.md` checkmarks, [CHANGELOG.md](CHANGELOG.md) per version)
+- [x] ZIP reproducible (`spsync-1.0.0-rc1.zip`, `manifest` at root), `minSupVersion` honest
+- [x] Bump `M` via PR utilisateur → `1.0.0-rc1` (tag pré-release), tests RC en cours avant `v1.0.0` finale
 
 ## Out of Scope (immediate)
 

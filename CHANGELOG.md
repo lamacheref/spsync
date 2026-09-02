@@ -5,6 +5,19 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [1.0.0-rc1] - 2026-09-02
+
+### Added
+- **Phase 5 Delivery** — release candidate 1.0.0. Regroupe Phases 0-4 (voir [PROJET.md](PROJET.md), [FEATURES.md](FEATURES.md)) :
+  - issueProvider Zammad (poll 90s, secret `setSecret` local-only, i18n EN/FR, icône Zammad officielle selfh.st)
+  - Lecture : `searchIssues` global `NOT closed/merged` (numéro/id/titre, fallback pagination `page 131` pour index retardé), `getById` + `ticket_articles`
+  - Auto-index **hors backlog** : `owner (new|open)` affectés → vraie tâche projet sélectionné/Zammad, dedup 500, notif
+  - Sortie d'attente `pending → open` → sous-tâche `🔔` idempotente sous la tâche parente
+  - Hardening : `withRetry` backoff exponentiel 429/timeout (3×), 401 non-retry + snack, docs auto-sync + CI (Gitea + GitHub), hooks pre-commit
+
+### Changed
+- Version `0.5.0 → 1.0.0` (major, via PR utilisateur — `VERSIONING.md`), RC tag `1.0.0-rc1`, archives `0.3.18`, `0.5.0`, `1.0.0-rc1`
+
 ## [0.5.0] - 2026-09-02
 
 ### Added
