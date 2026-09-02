@@ -239,14 +239,18 @@ PluginAPI.registerIssueProvider({
   },
 
   // F1.3 + F1.5: search → /tickets/search with limit 50, sort updated_at desc, handle pagination
+  // Fix: search by ticket number (e.g. 202609019400031) was filtered by default new/open query.
+  // Now: never filter open (user request), only filter closed/merged.
   async searchIssues(searchTerm, config, http) {
     const base = (config.zammadUrl || '').replace(/\/+$/, '');
     if (!base) {
       console.warn('[Zammad SPsync] searchIssues: no zammadUrl');
       return [];
     }
-    // Default: show new + open if user typed nothing; respects searchTerm when provided (Issue Panel)
-    const q = (searchTerm && String(searchTerm).trim()) || 'state.name:new OR state.name:open';
+    const raw = searchTerm && String(searchTerm).trim();
+    // When user types a number, Zammad full-text search on `number` works (tested 202609019400031 → 6605).
+    // We keep open visible, only exclude closed/merged per user request.
+    const q = raw ? `${raw} AND NOT state.name:closed AND NOT state.name:merged` : 'NOT state.name:closed AND NOT state.name:merged';
     const url = `${base}/api/v1/tickets/search`;
     const timeout = getTimeout(config);
     console.log('[Zammad SPsync] searchIssues', { q, timeout });
