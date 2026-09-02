@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# pre-commit — enforce VERSION bump à chaque commit
+
+# Allow merge commits and initial commit
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+  OLD_VER=$(git show HEAD:VERSION 2>/dev/null | tr -d ' \n\r' || echo "")
+else
+  OLD_VER=""
+fi
+NEW_VER=$(tr -d ' \n\r' < VERSION 2>/dev/null || echo "")
+
+if [[ -z "$NEW_VER" ]]; then
+  echo "❌ VERSION file manquant" >&2
+  exit 1
+fi
+if ! [[ "$NEW_VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "❌ VERSION invalide: $NEW_VER (attendu M.m.f)" >&2
+  exit 1
+fi
+if [[ "$OLD_VER" == "$NEW_VER" ]]; then
+  echo "❌ VERSION non bumpée ($NEW_VER inchangé depuis HEAD)" >&2
+  echo "   Règle: chaque commit bump f → ./scripts/bump.sh" >&2
+  echo "   Feature → ./scripts/bump.sh minor | Major (PR uniquement) → ./scripts/bump.sh major" >&2
+  exit 1
+fi
+# Vérifier manifest sync si présent
+if [[ -f manifest.json ]]; then
+  MVER=$(python3 -c "import json; print(json.load(open('manifest.json')).get('version',''))" 2>/dev/null || echo "")
+  if [[ -n "$MVER" && "$MVER" != "$NEW_VER" ]]; then
+    echo "❌ manifest.json version ($MVER) != VERSION ($NEW_VER)" >&2
+    exit 1
+  fi
+fi
+echo "✅ VERSION $OLD_VER → $NEW_VER"
