@@ -3,7 +3,7 @@
 > **Bridge Zammad → Super Productivity.** Turns Zammad tickets into Super Productivity tasks via a native `issueProvider` plugin.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.8-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.3.9-blue.svg)](VERSION)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-spsync-lightgrey.svg)](#)
 [![GitHub](https://img.shields.io/badge/GitHub-lamacheref%2Fspsync-181717.svg?logo=github)](https://github.com/lamacheref/spsync)

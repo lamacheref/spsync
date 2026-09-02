@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 3 out of waiting 🚧 IN PROGRESS (`0.3.7`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 3 out of waiting 🚧 IN PROGRESS (`0.3.9`), see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 

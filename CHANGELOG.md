@@ -5,6 +5,12 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.9] - 2026-09-02
+
+### Changed
+- `icon.svg`: replace generic support icon with official **Zammad** icon from https://selfh.st/icons/ (`zammad.svg`, `cdn.jsdelivr.net/gh/selfhst/icons@main/svg/zammad.svg`, 1.7K, CC) — `manifest.json:icon` unchanged
+- Archive: keep 3 latest `spsync-0.3.7.zip` (13K), `0.3.8.zip` (13K), `0.3.9.zip` (13K) — pruned `0.3.6` (still available as tag `0.3.6` + Release)
+
 ## [0.3.8] - 2026-09-02
 
 ### Changed
