@@ -1,54 +1,56 @@
 # ROADMAP — SPsync
 
-> Version 0.1 — 2026-09-02 — statut : **Analyse terminée, dev non démarré**
+> Version 0.1 — 2026-09-02 — status: **Analysis done, dev not started**  
+> Repository: `<GITEA_URL>` (real URL in `.cred`, ignored). Branch `Dev` → PR → `main`.
 
 ## Vision
-Connecteur Zammad → Super Productivity : refléter automatiquement dans SP les tickets pertinents pour Fabrice (id 3) sous forme de tâches / sous-tâches.
 
-## Jalons
+Zammad → Super Productivity connector (issueProvider): automatically surface relevant Zammad tickets in SP as tasks/subtasks. Primary user: NehwonLM (`<ZAMMAD_USER_ID>` placeholder, real id in `.cred`).
 
-### M0 — Analyse & faisabilité (✅ FAIT le 2026-09-02)
-- Validation `ZAMMAD_URL`, `ZAMMAD_TOKEN`, résolution `ZAMMAD_USER_ID=3`, test `ZAMMAD_TIMEOUT` & `ZAMMAD_INCLUDE_UPDATED`
-- Reverse SP Local REST API (`127.0.0.1:3876`, Bearer `URw8qzHTXD0J27bwOltuls7DpTOCyCR8`, routes `/tasks`, `/projects`, `/status`, `/health`)
-- Preuve création/suppression tâche SP, preuve search Zammad DSL `owner_id:3 AND state.name:new` et `state:pending reminder`
-- Livrables : `PROJET.md` § Analyse, `TODO.md`, `ROADMAP.md`
+## Milestones
 
-### M1 — MVP Socle (Semaine 1)
-- Clients HTTP Zammad + SP + persistance `lastSyncAt` + cache état
-- Commande `spsync --once --dry-run` qui liste sans écrire
-- Critère sortie : `GET /status` OK, `search` Zammad OK, logs sans erreur
+### M0 — Analysis & Feasibility (✅ DONE 2026-09-02)
+- Validation `ZAMMAD_URL`, `ZAMMAD_TOKEN` placeholder, resolution `<ZAMMAD_USER_ID>` via `/users/me`, `ZAMMAD_TIMEOUT` & `ZAMMAD_INCLUDE_UPDATED`
+- Reverse SP Local REST API (`127.0.0.1:3876`, Bearer `<SP_TOKEN>`, routes `/tasks`, `/projects`, `/status`, `/health`) — now superseded by plugin `PluginAPI`
+- Chosen architecture: **issueProvider plugin** (poll 90s, `issueProviderKey: ZAMMAD`) — daemon kept as fallback
+- Deliverables: `PROJET.md`, `TODO.md`, `ROADMAP.md`, `FEATURES.md`
 
-### M2 — Use-case B : Nouveau affecté (Semaine 1-2)
-- Polling `owner_id:3 AND state:new` + détection affectation par tiers
-- Création tâche SP idempotente
-- Critère sortie : ticket mis à `new` et affecté à Fabrice par un collègue → tâche SP apparaît < 2 min
+### M1 — MVP Foundation (Week 1)
+- `plugin.js:registerIssueProvider` + `manifest.json` + `icon.svg` + secret storage
+- `getNewIssuesForBacklog` (newly assigned) + `searchIssues`/`getById`
+- ZIP installs clean, `testConnection` green
 
-### M3 — Use-case A : Sortie d'attente (Semaine 2)
-- Polling `open + updated_at` + comparaison cache `pending reminder → open`
-- Sous-tâche `🔔 Sorti d'attente` sous tâche parente du ticket
-- Critère sortie : ticket `pending reminder` dont `pending_time` expire → sous-tâche créée
+### M2 — Use-case B: Newly Assigned (Week 1-2)
+- Polling `owner_id:<ZAMMAD_USER_ID> AND state:new` + peer detection
+- Idempotent task creation
+- Exit: ticket assigned to `<ZAMMAD_USER_ID>` by peer → SP task in < 90s
 
-### M4 — Durcissement (Semaine 3)
-- Pagination, retry 503/429, rotation token SP, gestion `401 Zammad`
-- Tests auto + doc install
-- Critère sortie : 7 jours sans doublon ni perte, dry-run vs live identique
+### M3 — Use-case A: Out of Waiting (Week 2)
+- Poll `open + updated_at` + `stateCache` (`pending reminder(3) → open(2)`)
+- Subtask `🔔 Out of waiting` under parent ticket task
+- Exit: pending ticket expiry → subtask created
 
-### M5 — Déploiement (Semaine 3-4)
-- Service systemd `spsync.service`, autostart, monitoring `GET /health`
-- Critère sortie : service actif au boot, logs journald
+### M4 — Hardening (Week 3)
+- Pagination, errors, backoff, `manifest.json:version` ↔ `VERSION`
+- Tests + install docs, i18n if needed
+- Exit: 7 days without duplication/loss
 
-## Risques
-- SP non lancé → 503 ; mitigation : retry + notif
-- Zammad sans history API → mitigation : cache local
-- SP sous-tâches 1 niveau max → mitigation : aplatir
+### M5 — Release (Week 3-4)
+- Gitea Release `vM.m.f` from `main`, ZIP asset, `CHANGELOG.md`
+- Candidate for community list (Reddit / GitHub Discussions)
 
-## Post-MVP (idées, non priorisées)
-- Support `pending close` (state 7)
-- Tag SP dédié `zammad` + filtre
-- Webhook Zammad si infra le permet
-- UI config dans SP (plugin)
+## Risks
 
-## Dépendances
-- Zammad https://zammad.smiden.eu accessible + token valide (testé)
-- Super Productivity ≥ vX avec Local REST API activé (Settings → Misc → Enable Local REST API) — testé `rendererReady:true`
-- Python ≥3.11 ou Node ≥18
+- SP not launched → plugin still lives (advantage over daemon)
+- Zammad no history API → mitigation: local `stateCache` via `persistDataSynced`
+- SP subtasks 1 level max → mitigation: flatten
+
+## Post-MVP (see FEATURES.md P1-P4)
+
+- `pending close` (state 7), tag filter, webhook (if infra allows), iframe dashboard
+
+## Dependencies
+
+- Zammad `<ZAMMAD_URL>` reachable + token (placeholder `<ZAMMAD_TOKEN>` in docs, real in `.cred`)
+- Super Productivity ≥ `14.0.2` — tested `rendererReady:true`
+- Node ≥18 for packaging (zip)

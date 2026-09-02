@@ -1,112 +1,112 @@
 # FEATURES — SPsync (Plugin issueProvider Zammad)
 
-> Version du document : 0.1.0 — 2026-09-02  
-> Architecture cible validée : **Plugin `issueProvider`** Super Productivity (cf. `PROJET.md:143`).  
-> Dépôt : https://gitea.smiden.eu/flamachere/spsync.git — branche de travail `Dev`, releases sur `main`.
+> Document version: 0.1.1 — 2026-09-02  
+> Target architecture: **Plugin `issueProvider`** Super Productivity (cf. `PROJET.md`).  
+> Repository: `<GITEA_URL>` — work branch `Dev`, releases on `main`. Real URL in `.cred` (ignored).
 
 ---
 
 ## Conventions
 
-- **M.m.f** : `M`=Major (breaking, PR utilisateur uniquement), `m`=Minor (nouvelle feature), `f`=Fix/Patch (chaque commit bump `f`, même si non-fix — règle projet).
-- **Phase** = incrément `m` potentiel. Chaque Phase livre un ZIP installable via `Settings → Plugins → Choose Plugin File`.
-- **Source vérité Zammad** : `https://zammad.smiden.eu`, `GET /api/v1/tickets/search` DSL, `GET /api/v1/ticket_articles/by_ticket/:id`, token `Token token=...` (stocké via `setSecret`).
+- **M.m.f**: `M`=Major (breaking, user PR only), `m`=Minor (new feature), `f`=Patch (each commit bumps `f`, even if not a fix).
+- **Phase** = potential `m` increment. Each Phase delivers a ZIP via `Settings → Plugins → Choose Plugin File`.
+- **Zammad source of truth**: `<ZAMMAD_URL>` (e.g. `https://zammad.example.com`), `GET /api/v1/tickets/search` DSL, `GET /api/v1/ticket_articles/by_ticket/:id`, token via `setSecret` (see `.cred` for real `<ZAMMAD_TOKEN>`).
 
 ---
 
-## Phase 0 — Socle & Installation (v0.1.0)
+## Phase 0 — Foundation & Installation (v0.1.x)
 
-**Objectif :** plugin vide qui s'installe, se configure et se débug.
+**Goal:** empty plugin that installs, configures and debugs.
 
-| # | Feature | Description | Critère d'acceptation |
+| # | Feature | Description | Acceptance |
 |---|---|---|---|
-| F0.1 | Scaffolding plugin | `manifest.json` (`id: zammad-spsync`, `type: issueProvider`, `issueProvider: {pollIntervalMs: 90000, icon: support, humanReadableName: Zammad, issueProviderKey: ZAMMAD}`, `iFrame: false`), `plugin.js`, `icon.svg`, `README` | ZIP s'installe sans erreur, apparaît dans `Settings → Plugins`, `F12` sans exception |
-| F0.2 | Config Zammad | `registerIssueProvider.configFields` : `zammadUrl` (input, default `https://zammad.smiden.eu`), `zammadToken` (password), `zammadUserId` (input, vide = auto `/users/me`), `pollInterval` (select 30s/90s/300s), `autoAddBacklog` (checkbox) | Champs visibles, valeurs persistées (config synchée sauf secret), `testConnection` button → `GET /users/me` → `200` |
-| F0.3 | Secret storage | Token stocké via `PluginAPI.setSecret("zammadToken")` / `getSecret`, jamais en `configFields` synché, jamais exporté | Après `persistDataSynced` / Export, token absent ; `getHeaders` relit `getSecret` (async) ; après uninstall, secret purgé |
-| F0.4 | Health check | `getHeaders` + `testConnection` : `GET /api/v1/users/me`, `GET /api/v1/ticket_states` | `testConnection` → `true` si `id` retourné, `false` sinon + `showSnack(ERROR)` |
-| F0.5 | Logs & debug | `console.log` préfixé `[Zammad]` + `showSnack` sur erreur réseau | Erreur réseau visible en DevTools + snackbar |
+| F0.1 | Scaffolding | `manifest.json` (`id: zammad-spsync`, `type: issueProvider`, `issueProvider: {pollIntervalMs: 90000, icon: support, humanReadableName: Zammad, issueProviderKey: ZAMMAD}`, `iFrame: false`), `plugin.js`, `icon.svg` | ZIP installs without error, appears in `Settings → Plugins`, `F12` clean |
+| F0.2 | Zammad config | `registerIssueProvider.configFields`: `zammadUrl` (input, default `<ZAMMAD_URL>`), `zammadUserId` (input, empty = auto `/users/me`), `pollInterval` (select 30s/90s/300s), `autoAddBacklog` (checkbox) — token NOT here (see F0.3) | Fields visible, values persisted (synced except secret), `testConnection` → `GET /users/me` → `200` |
+| F0.3 | Secret storage | Token via `PluginAPI.setSecret("zammadToken")` / `getSecret`, never in `configFields` synched, never exported (real `<ZAMMAD_TOKEN>` lives in `.cred`) | After `persistDataSynced` / Export, token absent; `getHeaders` re-reads `getSecret` (async); purged on uninstall |
+| F0.4 | Health check | `getHeaders` + `testConnection`: `GET /api/v1/users/me`, `GET /api/v1/ticket_states` | `testConnection` → `true` if `id` returned, `false` + `showSnack(ERROR)` otherwise |
+| F0.5 | Logs & debug | `console.log` prefixed `[Zammad]` + `showSnack` on network error | Error visible in DevTools + snackbar |
 
 ---
 
-## Phase 1 — Lecture Zammad (v0.2.0)
+## Phase 1 — Zammad Reading (v0.2.0)
 
-**Objectif :** le plugin sait parler à Zammad.
+**Goal:** plugin talks to Zammad.
 
-| # | Feature | Description | Critère |
+| # | Feature | Description | Criteria |
 |---|---|---|---|
-| F1.1 | Client HTTP | Wrapper `PluginHttp` : `get(url, {params, headers})` avec `Authorization: Token token=...` via `getHeaders`, `timeout: ZAMMAD_TIMEOUT=30s` | `GET /tickets/search?q=state.name:new&limit=3` → 200 en <30s |
-| F1.2 | Résolution UserId | Si `zammadUserId` vide, `GET /users/me` → `id` (ex: 3) mémorisé en `persistDataSynced` | `owner_id:3` utilisé dans toutes les requêtes suivantes |
-| F1.3 | Mapping ticket → issue | `searchIssues(searchTerm, cfg, http)` mappe `ticket` → `PluginSearchResult {id, title:#number title, url: /#ticket/zoom/id, status, assignee, labels}` et `getById` → `PluginIssue {id, title, body, url, state, lastUpdated, comments}` via `ticket_articles` | Issue affichée dans Issue Panel avec lien cliquable Zammad |
-| F1.4 | Issue display | `issueDisplay: [{summary link}, {state}, {assignee}, {group}, {pending_time}]`, `commentsConfig: {author:from, body, created:created_at}` | Panneau détail montre articles non-internes, dates lisibles |
-| F1.5 | Pagination & limit | `limit=50`, `per_page` + tri `updated_at desc` | >50 tickets : 2e page chargée sans perte |
+| F1.1 | HTTP client | Wrapper `PluginHttp`: `get(url, {params, headers})` with `Authorization: Token token=<ZAMMAD_TOKEN>` via `getHeaders`, `timeout: 30s` | `GET /tickets/search?q=state.name:new&limit=3` → 200 in <30s |
+| F1.2 | UserId resolution | If `zammadUserId` empty, `GET /users/me` → `id` (e.g. `3`) cached in `persistDataSynced` | `owner_id:<ZAMMAD_USER_ID>` used in all following queries |
+| F1.3 | Ticket → issue mapping | `searchIssues(searchTerm, cfg, http)` maps `ticket` → `PluginSearchResult {id, title:#number title, url: /#ticket/zoom/id, status, assignee}` and `getById` → `PluginIssue {id, title, body, url, state, lastUpdated, comments}` via `ticket_articles` | Issue shown in Issue Panel with clickable Zammad link |
+| F1.4 | Issue display | `issueDisplay: [{summary link}, {state}, {assignee}, {group}, {pending_time}]`, `commentsConfig: {author:from, body, created:created_at}` | Detail panel shows non-internal articles, readable dates |
+| F1.5 | Pagination & limit | `limit=50`, `per_page` + sort `updated_at desc` | >50 tickets: 2nd page without loss |
 
 ---
 
-## Phase 2 — Use-case B : Nouveaux affectés (v0.3.0)
+## Phase 2 — Use-case B: Newly Assigned (v0.3.0)
 
-**Objectif :** premier besoin métier — tickets `new` affectés par un collègue.
+**Goal:** first business need — `new` tickets assigned by a peer.
 
-| # | Feature | Description | Critère |
+| # | Feature | Description | Criteria |
 |---|---|---|---|
-| F2.1 | Requête Zammad | `getNewIssuesForBacklog` : `owner_id:<userId> AND state.name:new AND updated_at:>lastSyncAt` (DSL validé `PROJET.md:34`). Si `ZAMMAD_INCLUDE_UPDATED=false`, fallback `created_at:>lastSyncAt` | Nouveau ticket affecté à Fabrice par collègue → apparaît en < `pollInterval` |
-| F2.2 | Détection "par un collègue" | Comparer `owner_id` courant vs cache `prevOwnerId` + `updated_by_id != userId` → marquer `isNewlyAssignedByPeer=true` | Ticket créé par Fabrice lui-même ≠ notifié ; ticket réaffecté par collègue = notifié |
-| F2.3 | Déduplication | Cache `persistDataSynced: {seenIds: Set, lastSyncAt: ISO8601, ownerCache: {id→owner}}` + hook `persistedDataChanged` | Même ticket ne réapparaît pas après import, même après reboot |
-| F2.4 | Import | Issue → tâche SP : `title: "🆕 [Zammad #number] title"`, `notes: url + excerpt article 0`, `issueId/idProvider` liés, `issueWasUpdated` si `updated_at` bump | `Add to backlog` crée tâche avec lien Zammad cliquable |
-| F2.5 | Notif | `notify({title, body})` + `showSnack(SUCCESS)` si `autoAddBacklog=false` | L'utilisateur est alerté sans spam (max 1 notif / poll) |
+| F2.1 | Zammad query | `getNewIssuesForBacklog`: `owner_id:<ZAMMAD_USER_ID> AND state.name:new AND updated_at:>lastSyncAt` (DSL validated). If `ZAMMAD_INCLUDE_UPDATED=false`, fallback `created_at:>lastSyncAt` | New ticket assigned to `<ZAMMAD_USER_ID>` by peer → appears in < `pollInterval` |
+| F2.2 | “by a peer” detection | Compare current `owner_id` vs cached `prevOwnerId` + `updated_by_id != <ZAMMAD_USER_ID>` → `isNewlyAssignedByPeer=true` | Ticket created by self ≠ notified; re-assigned by peer = notified |
+| F2.3 | Deduplication | Cache `persistDataSynced: {seenIds: Set, lastSyncAt: ISO8601, ownerCache: {id→owner}}` + hook `persistedDataChanged` | Same ticket not re-added after import, even after reboot |
+| F2.4 | Import | Issue → SP task: `title: "🆕 [Zammad #number] title"`, `notes: url + excerpt`, `issueId/idProvider` linked, `issueWasUpdated` if `updated_at` bump | `Add to backlog` creates task with clickable link |
+| F2.5 | Notification | `notify({title, body})` + `showSnack(SUCCESS)` if `autoAddBacklog=false` | User alerted without spam (max 1 / poll) |
 
 ---
 
-## Phase 3 — Use-case A : Sortie d'attente (v0.4.0)
+## Phase 3 — Use-case A: Out of Waiting (v0.4.0)
 
-**Objectif :** second besoin métier — tickets qui sortent de `pending reminder`.
+**Goal:** second business need — `pending reminder` expiry.
 
-| # | Feature | Description | Critère |
+| # | Feature | Description | Criteria |
 |---|---|---|---|
-| F3.1 | Détection transition | Cache `stateCache: {ticketId→state_id}`. Poll `state.name:open AND updated_at:>lastSyncAt` puis filtrer `prevState==3 (pending reminder)` (id 3 validé `PROJET.md:30`). Heuristique fallback : `pending_time:null` + `updated_at` récent | Ticket #6530 `pending_time 2026-09-08` → `open` → détecté en <90s |
-| F3.2 | Création sous-tâche | Hook `taskUpdate` / `persistedDataChanged` : si ticket parent existe, `addTask({title: "🔔 Sorti d'attente — "+pending_time+" → "+now, parentId: parentTaskId})` ; sinon créer tâche mère puis sous-tâche | Sous-tâche sous tâche mère `Zammad #number`, 1 niveau max (cf. `PROJET.md:80`), idempotence via clé `zammad:<id>:pending:<time>` |
-| F3.3 | Idempotence | Clé stockée en `notes` ou `tagIds` de la sous-tâche, vérifiée via `getTasks()` avant création | Relance poll ne duplique pas la sous-tâche |
-| F3.4 | Lien article | Sous-tâche `notes` = dernier `ticket_articles` (réponse sortie d'attente) + lien zoom | Click `notes` → Zammad ticket |
+| F3.1 | Transition detection | Cache `stateCache: {ticketId→state_id}`. Poll `state.name:open AND updated_at:>lastSyncAt` then filter `prevState==3 (pending reminder)` (id 3). Fallback heuristic: `pending_time:null` + recent `updated_at` | Sample `pending_time 2026-09-08` → `open` → detected in <90s |
+| F3.2 | Subtask creation | Hook `taskUpdate` / `persistedDataChanged`: if parent task exists, `addTask({title: "🔔 Out of waiting — "+pending_time+" → "+now, parentId})`; else create parent then subtask | Subtask under `Zammad #number`, 1 level max, idempotent via `zammad:<id>:pending:<time>` |
+| F3.3 | Idempotence | Key stored in `notes` or `tagIds`, checked via `getTasks()` before creation | Re-poll does not duplicate |
+| F3.4 | Article link | Subtask `notes` = latest `ticket_articles` + zoom link | Click → Zammad ticket |
 
 ---
 
-## Phase 4 — Finition & Qualité (v0.5.0 → v1.0.0)
+## Phase 4 — Polish & Quality (v0.5.0 → v1.0.0)
 
-| # | Feature | Description | Critère |
+| # | Feature | Description | Criteria |
 |---|---|---|---|
-| F4.1 | Field mappings | `fieldMappings: [{taskField:isDone, issueField:state, pullOnly}, {title, notes off}]` — `isDone` synché si ticket `closed(4)` | Fermer tâche → ne ferme pas ticket (pullOnly) ; fermer ticket Zammad → tâche `issueWasUpdated=true` |
-| F4.2 | Backlog auto | `defaultAutoAddToBacklog: true/false` configurable + `getNewIssuesForBacklog` respecte le toggle SP | Nouveaux tickets arrivent auto en backlog si activé |
-| F4.3 | Erreurs & offline | `showSnack(ERROR)` si `401 Token`, `429`, `timeout`, `renderer not ready` ; backoff exponentiel | Pas de spam, retry après 2^n * pollInterval |
-| F4.4 | i18n | `i18n: {languages: ["en","fr"]}`, traductions `fr.json` (via `PluginAPI.translate`) pour configFields | UI en français si SP en français |
-| F4.5 | Packaging & doc | `icon.svg`, `README`, `CHANGELOG.md`, ZIP reproductible (`manifestVersion:1`, `minSupVersion:14.0.2`) | ZIP installable sur `test-app.super-productivity.com` sans warning |
+| F4.1 | Field mappings | `fieldMappings: [{taskField:isDone, issueField:state, pullOnly}]` — `isDone` synced if ticket `closed(4)` | Closing task ≠ close ticket (pullOnly); closing ticket → `issueWasUpdated=true` |
+| F4.2 | Backlog auto | `defaultAutoAddToBacklog` + `getNewIssuesForBacklog` respects toggle | New tickets auto-add if enabled |
+| F4.3 | Errors & offline | `showSnack(ERROR)` on `401`, `429`, `timeout`, `renderer not ready`; exponential backoff | No spam, retry after 2^n * pollInterval |
+| F4.4 | i18n | `i18n: {languages: ["en","fr"]}`, `fr.json` via `PluginAPI.translate` | UI in French if SP is French |
+| F4.5 | Packaging & doc | `icon.svg`, `CHANGELOG.md`, ZIP reproducible (`manifestVersion:1`, `minSupVersion:14.0.2`) | ZIP installs on https://test-app.super-productivity.com clean |
 
-**v1.0.0 = toutes phases 0-4 vertes + tests manuels sur 2 tickets réels (un `new` affecté, un `pending reminder→open`) + doc install.**
+**v1.0.0 = phases 0-4 green + manual tests on 2 real tickets (`new` assigned + `pending reminder→open`) + install docs.**
 
 ---
 
-## Post-v1.0.0 — Fonctionnalités complémentaires (proposées, non priorisées)
+## Post-v1.0.0 — Complementary Features (proposed, not prioritized)
 
-> Chaque proposition = futur bump `m` (Minor). Un bump `M` (Major) uniquement via PR utilisateur (règle versioning).
+> Each proposal = future `m` bump. `M` bump only via user PR (versioning rule).
 
-### P1 — Productivité immédiate
-- **P1.1 Tri & filtres Issue Panel** : filtre par `group` (Techniciens/Utilisateurs/VIP), `priority`, `escalation_at`. `searchIssues` respecte `searchTerm` déjà supporté, ajouter `configFields: groupFilter` (multiSelect).
-- **P1.2 Actions rapides** : `updateIssue` (changer `state` → `open/closed`, `owner_id`) depuis SP via `fieldMappings` `pushOnly` — nécessite droits `group_ids:full` (validé pour Fabrice).
-- **P1.3 Création ticket depuis SP** : `createIssue(title, cfg, http)` → `POST /api/v1/tickets` — créer un ticket Zammad depuis une tâche SP.
-- **P1.4 Time tracking** : `issueTimeTracked` ↔ `timeSpent` via `fieldMappings` (`time_unit` Zammad).
+### P1 — Immediate Productivity
+- **P1.1 Filters**: by `group`, `priority`, `escalation_at`. `searchIssues` already respects `searchTerm`, add `configFields: groupFilter` (multiSelect).
+- **P1.2 Quick actions**: `updateIssue` (`state` → `open/closed`, `owner_id`) via `fieldMappings` `pushOnly` — needs `group_ids:full`.
+- **P1.3 Create ticket from SP**: `createIssue(title, cfg, http)` → `POST /api/v1/tickets`.
+- **P1.4 Time tracking**: `issueTimeTracked` ↔ `timeSpent` via `fieldMappings` (`time_unit`).
 
-### P2 — Observabilité
-- **P2.1 Dashboard iframe** : `iFrame:true` + `index.html` avec `getTasks()` + stats Zammad (nb `new`, `pending`, `open` par `owner_id`) — UI Kit SP (`--c-primary`, `--card-bg`).
-- **P2.2 Compteurs** : `SimpleCounter` (`getCounter/setCounter`) pour `nb sorties d'attente / jour` — visible dans SP.
-- **P2.3 Notifications natives** : `PluginAPI.notify` avec `requireInteraction` pour escalades (`escalation_at` proche).
+### P2 — Observability
+- **P2.1 Iframe dashboard**: `iFrame:true` + `index.html` with `getTasks()` + Zammad stats — UI Kit (`--c-primary`, `--card-bg`).
+- **P2.2 Counters**: `SimpleCounter` (`getCounter/setCounter`) for `out-of-waiting / day`.
+- **P2.3 Native notifications**: `PluginAPI.notify` with `requireInteraction` for `escalation_at` near.
 
-### P3 — Robustesse
-- **P3.1 `pending close` (id 7)** : traiter comme `pending reminder` si besoin métier (support le fait, cf. ticket_states).
-- **P3.2 Webhook Zammad (si infra le permet)** : endpoint local qui pousse au lieu de poll — divise latence et charge. Nécessite plugin serveur Zammad ou n8n intermédiaire.
-- **P3.3 Multi-utilisateur** : config `zammadUserId` = liste, ou mode "équipe" (tous `new` non assignés).
-- **P3.4 Offline queue** : si SP offline, `persistDataSynced` queue les créations et rejoue à `persistedDataChanged`.
+### P3 — Robustness
+- **P3.1 `pending close` (id 7)**: handle like `pending reminder` if needed.
+- **P3.2 Webhook**: local endpoint push vs poll — needs Zammad server plugin or n8n.
+- **P3.3 Multi-user**: `zammadUserId` = list or team mode (all unassigned `new`).
+- **P3.4 Offline queue**: `persistDataSynced` queue + replay on `persistedDataChanged`.
 
-### P4 — Intégration avancée
-- **P4.1 Calendar provider** : `dueWithTime` ↔ `pending_time` pour agenda (comme `google-calendar-provider`).
-- **P4.2 Automation** : `registerHook(Hooks.TASK_COMPLETE)` → auto `PATCH /tickets/:id {state: closed}` (avec consentement).
-- **P4.3 `nodeExecution` (desktop only)** : avec `permissions: ["nodeExecution"]` + consent dialog, lancer `zammad-cli` ou script local — jamais en web.
+### P4 — Advanced Integration
+- **P4.1 Calendar**: `dueWithTime` ↔ `pending_time` (like `google-calendar-provider`).
+- **P4.2 Automation**: `registerHook(Hooks.TASK_COMPLETE)` → auto `PATCH /tickets/:id {state: closed}` (with consent).
+- **P4.3 `nodeExecution` (desktop only)**: with `permissions: ["nodeExecution"]` + consent dialog — never on web.
 
-Voir `ROADMAP.md` pour l'ordonnancement.
+See `ROADMAP.md` for scheduling.

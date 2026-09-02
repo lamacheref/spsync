@@ -8,10 +8,12 @@ Thumbs.db
 *.swp
 *~
 
-# Env / secrets
+# Env / secrets — real credentials never committed (see .cred.example)
 .env
 .env.local
 *.token
+.cred
+.cred.local
 
 # Build
 dist/

@@ -29,7 +29,7 @@ PluginAPI.registerIssueProvider({
       key: 'zammadUrl',
       type: 'input',
       label: 'Zammad URL',
-      description: 'Base URL, e.g. https://zammad.smiden.eu',
+      description: 'Base URL, e.g. https://zammad.example.com',
       required: true,
       pattern: '^https?://.+',
     },
@@ -62,7 +62,7 @@ PluginAPI.registerIssueProvider({
     if (!base) return [];
     // Default query if user typed nothing — show open/new tickets
     const q = searchTerm || 'state.name:new OR state.name:open';
-    // Zammad DSL: https://zammad.smiden.eu/api/v1/tickets/search?query=...
+    // Zammad DSL: https://zammad.example.com/api/v1/tickets/search?query=...
     const url = `${base}/api/v1/tickets/search`;
     const res = await http.get(url, { params: { query: q, limit: '20' } });
     // res is array of tickets

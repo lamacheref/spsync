@@ -3,11 +3,11 @@
 > **Bridge Zammad → Super Productivity.** Turns Zammad tickets into Super Productivity tasks via a native `issueProvider` plugin.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](VERSION)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
-[![Gitea](https://img.shields.io/badge/Gitea-flamachere%2Fspsync-lightgrey.svg)](https://gitea.smiden.eu/flamachere/spsync)
+[![Gitea](https://img.shields.io/badge/Gitea-spsync-lightgrey.svg)](#)
 
-**Repository:** https://gitea.smiden.eu/flamachere/spsync.git — work branch `Dev`, releases on `main`, versioning `M.m.f` (see [VERSIONING.md](VERSIONING.md)).
+**Repository:** `<GITEA_URL>` (e.g. `https://gitea.example.com/<user>/spsync.git`) — work branch `Dev`, releases on `main`, versioning `M.m.f` (see [VERSIONING.md](VERSIONING.md)). Real URL is stored in `.cred` (ignored).
 
 ---
 
@@ -39,7 +39,7 @@ Both features are required for the initial release. The phrasing *“files”* i
 
 Legacy objective (now superseded but kept for traceability):
 
-> Create a connector that creates tasks in Super Productivity via its Local REST API (`http://127.0.0.1:3876`, token `URw8qzHTXD0J27bwOltuls7DpTOCyCR8`). The daemon approach is still documented as a fallback (see [§ Plugin vs Daemon](#plugin-vs-daemon--decision)).
+> Create a connector that creates tasks in Super Productivity via its Local REST API (`http://127.0.0.1:3876`, token `<SP_TOKEN>` — see `.cred`). The daemon approach is still documented as a fallback (see [§ Plugin vs Daemon](#plugin-vs-daemon--decision)).
 
 ---
 
@@ -71,8 +71,8 @@ spsync/
 
 | Criterion | Daemon (external, via Local REST API) | **Plugin (native, chosen)** |
 |---|---|---|
-| Process | Separate Python/Node polling `https://zammad.smiden.eu` → `http://127.0.0.1:3876` | JS runs **inside** Super Productivity renderer |
-| SP auth | `Authorization: Bearer <token>` from `~/.config/superProductivity/local-rest-api-token` (0600) | None — direct `PluginAPI.addTask()` / `getTasks()` |
+| Process | Separate Python/Node polling `<ZAMMAD_URL>` → `http://127.0.0.1:3876` | JS runs **inside** Super Productivity renderer |
+| SP auth | `Authorization: Bearer <SP_TOKEN>` from `~/.config/superProductivity/local-rest-api-token` (0600) — see `.cred` | None — direct `PluginAPI.addTask()` / `getTasks()` |
 | Zammad net | `fetch`/`requests` | `PluginHttp` injected into `registerIssueProvider` callbacks (pre-authorized) |
 | Config | `.env` outside SP | `manifest.json` + `configFields` inside **Settings → Plugins** |
 | Multi-device sync | Local file, not synced | `persistDataSynced` synced via SP sync backend (if enabled) |
@@ -87,35 +87,35 @@ Full analysis (live tests 2026-09-02) was moved to a concise summary below; the 
 
 ## Feasibility Summary (validated 2026-09-02)
 
-All checks were run live from this workstation. No business code was written during the check.
+All checks were run live from this workstation (real credentials in `.cred`, placeholders below). No business code was written during the check.
 
-### Zammad — `https://zammad.smiden.eu`
+### Zammad — `<ZAMMAD_URL>` (e.g. `https://zammad.example.com`)
 
 | Config | Tested value | Result |
 |---|---|---|
-| `ZAMMAD_URL` | `https://zammad.smiden.eu` | ✅ `GET /api/v1/users/me` → `200`, `x-runtime ~56ms` |
-| `ZAMMAD_TOKEN` | `IoL1Esqh…Rgoz2kL` | ✅ `Authorization: Token token=…` valid |
-| `ZAMMAD_USER_ID` | *(empty)* | ✅ Resolved to `3` via `/users/me` → `fabrice.lamachere@smiden.fr` (PTI, `role_ids [1,2,3]`, `group_ids Techniciens/VIP/Utilisateurs: full`) |
+| `ZAMMAD_URL` | `<ZAMMAD_URL>` | ✅ `GET /api/v1/users/me` → `200`, `x-runtime ~56ms` |
+| `ZAMMAD_TOKEN` | `<ZAMMAD_TOKEN>` | ✅ `Authorization: Token token=…` valid |
+| `ZAMMAD_USER_ID` | *(empty)* | ✅ Resolved via `/users/me` → `<ZAMMAD_USER_EMAIL>` (see `.cred` for real mapping, e.g. id `3`, `role_ids [1,2,3]`) |
 | `ZAMMAD_TIMEOUT` | `30` | ✅ Appropriate |
 | `ZAMMAD_INCLUDE_UPDATED` | `true` | ✅ `GET /tickets/search?query=updated_at:>…` works |
 
-**Evidence:**
+**Evidence (sanitized):**
 
 - `GET /api/v1/ticket_states` → `new(1), open(2), pending reminder(3), closed(4), merged(5), pending close(7)`
-- `GET /api/v1/tickets/search?query=state.name:new` → 3 tickets (e.g. `#202609019400031` “câble PC-vidéoprojecteur”)
+- `GET /api/v1/tickets/search?query=state.name:new` → 3 tickets (e.g. `#202609019400031` sample)
 - `GET /api/v1/tickets/search?query=state.name:"pending reminder"` → tickets with `pending_time: "2026-09-08T22:12:00.000Z"`, `state_id:3`
-- `GET /api/v1/tickets/search?query=owner_id:3 AND state.name:new` → `[]` (valid DSL, just no matching ticket right now)
-- `GET /api/v1/tickets/search?query=owner_id:3` → ✅ 20+ tickets (e.g. `#6598` `open`, owner 3)
+- `GET /api/v1/tickets/search?query=owner_id:<ZAMMAD_USER_ID> AND state.name:new` → `[]` (valid DSL, just no matching ticket right now)
+- `GET /api/v1/tickets/search?query=owner_id:<ZAMMAD_USER_ID>` → ✅ 20+ tickets (e.g. `open`, owner `<ZAMMAD_USER_ID>`)
 - `GET /api/v1/tickets/:id/history` → `404` (not exposed) — use `ticket_articles/by_ticket/:id` + `updated_at` cache instead
 
-**Implication:** polling required (no client webhook). “Out of waiting” = detect transition `pending reminder(3) → open(2)` where `pending_time` becomes `null` and `updated_by_id:1` (system scheduler). “Newly assigned” = `owner_id:3 AND state:new` + `owner_id` transition `≠3 → 3` with `updated_by_id ≠3`.
+**Implication:** polling required (no client webhook). “Out of waiting” = detect transition `pending reminder(3) → open(2)` where `pending_time` becomes `null` and `updated_by_id:1` (system scheduler). “Newly assigned” = `owner_id:<me> AND state:new` + `owner_id` transition `≠me → me` with `updated_by_id ≠me`.
 
 ### Super Productivity
 
 | Endpoint | Auth | Result |
 |---|---|---|
 | `GET /health` | none | ✅ `{"server":"up","rendererReady":true}` |
-| `GET /status`, `GET /tasks`, `POST /tasks`, `DELETE /tasks/:id` | `Authorization: Bearer URw8qzHTXD0J27bwOltuls7DpTOCyCR8` | ✅ `taskCount:200`, test task `uVrM_OMjcW…` created & deleted |
+| `GET /status`, `GET /tasks`, `POST /tasks`, `DELETE /tasks/:id` | `Authorization: Bearer <SP_TOKEN>` (see `.cred`) | ✅ `taskCount:200`, test task created & deleted |
 | `GET /projects`, `GET /tags` | Bearer | ✅ listed |
 
 Reverse of `app.asar` (`/electron/local-rest-api.js:455`, `/electron/shared-with-frontend/local-rest-api.model.js:6`) confirmed routes and constraints (`50 concurrent`, `1 MiB body`, `15s renderer timeout`, strict `Host`, rejected `Origin`):
@@ -135,14 +135,14 @@ Subtasks are **one level max** (`addTask({parentId})` inherits `projectId`/`tagI
 [ Zammad ]  --HTTPS-->  [ SP Plugin (issueProvider) ]  --PluginAPI-->  [ SP task store ]
    ^                          | pollIntervalMs: 90000                    |
    |   ticket_articles        +-- getNewIssuesForBacklog():              +-- Issue Panel
-   +-- /tickets/search            owner_id:3 AND state:new               +-- backlog
+   +-- /tickets/search            owner_id:<me> AND state:new            +-- backlog
        /users/me                   pending reminder → open                +-- subtasks (🔔)
 ```
 
 - **Manifest** (`manifest.json:8`): `type: "issueProvider"`, `issueProvider: {pollIntervalMs: 90000, issueProviderKey: "ZAMMAD"}` — poll handled by SP, no manual `setInterval`.
 - **`plugin.js:28`**: `PluginAPI.registerIssueProvider({configFields, getHeaders, searchIssues, getById, getNewIssuesForBacklog, testConnection, issueDisplay, fieldMappings})`.
 - **Mapping Zammad → `PluginSearchResult` / `PluginIssue`**: `id=ticket.id`, `title="#number title"`, `url=/#ticket/zoom/id`, `status=state_id`, `lastUpdated=updated_at`, `comments=ticket_articles`.
-- **Secrets**: `PluginAPI.setSecret("zammadToken")` / `getSecret` — **local-only, never synced, never exported, purged on uninstall** ([docs/plugin-development.md § Secret Storage](https://github.com/super-productivity/super-productivity/blob/master/docs/plugin-development.md#secret-storage)). `getHeaders` reads from secret storage (async). Do **not** store the token in `configFields` or `persistDataSynced`.
+- **Secrets**: `PluginAPI.setSecret("zammadToken")` / `getSecret` — **local-only, never synced, never exported, purged on uninstall** ([docs/plugin-development.md § Secret Storage](https://github.com/super-productivity/super-productivity/blob/master/docs/plugin-development.md#secret-storage)). `getHeaders` reads from secret storage (async). Do **not** store the token in `configFields` or `persistDataSynced`. Real token lives in `.cred` (ignored).
 - **Subtasks for “out of waiting”**: hybrid `issueProvider` + `permissions: ["addTask","getTasks"]` + `hooks: ["taskUpdate"]` → `PluginAPI.addTask({parentId})` with dedup key `zammad:<id>:pending:<time>`.
 
 Detailed feature breakdown by phase: see [FEATURES.md](FEATURES.md). Execution plan: [TODO.md](TODO.md), [ROADMAP.md](ROADMAP.md).
@@ -155,7 +155,7 @@ Detailed feature breakdown by phase: see [FEATURES.md](FEATURES.md). Execution p
 
 1. Download `spsync.zip` from Gitea Releases (or build: `zip -r spsync.zip manifest.json plugin.js icon.svg`).
 2. Super Productivity → **Settings → Plugins → Choose Plugin File** → pick the ZIP.
-3. In the plugin config: set **Zammad URL** (`https://zammad.smiden.eu`) and provide the **Zammad token** via the plugin’s secret prompt (not the `configFields` text field).
+3. In the plugin config: set **Zammad URL** (e.g. `https://zammad.example.com`) and provide the **Zammad token** via the plugin’s secret prompt (not the `configFields` text field). Real values go in `.cred` for local dev.
 4. Optionally set **User ID** (leave empty to auto-resolve via `/users/me`) and **Poll interval**.
 
 ### Update / Uninstall
@@ -168,9 +168,13 @@ Detailed feature breakdown by phase: see [FEATURES.md](FEATURES.md). Execution p
 ## Development
 
 ```bash
-git clone https://gitea.smiden.eu/flamachere/spsync.git
+git clone <GITEA_URL>
 cd spsync
 git checkout Dev
+
+# copy real credentials (never committed)
+cp .cred.example .cred
+# edit .cred with <ZAMMAD_URL>, <ZAMMAD_TOKEN>, <SP_TOKEN>, etc.
 
 # edit plugin.js / manifest.json
 # bump version (each commit must bump f)
@@ -183,7 +187,7 @@ zip -r spsync.zip manifest.json plugin.js icon.svg
 # test in SP (Settings → Plugins → Choose Plugin File), DevTools F12
 ```
 
-**Prerequisites:** Super Productivity ≥ `14.0.2` (`minSupVersion`), Gitea token with `write:repository` for push.
+**Prerequisites:** Super Productivity ≥ `14.0.2` (`minSupVersion`), Gitea token with `write:repository` for push (store in `.cred` or env, never in docs).
 
 **Authoritative types:** [`packages/plugin-api/src/types.ts`](https://github.com/johannesjo/super-productivity/blob/master/packages/plugin-api/src/types.ts), [`issue-provider-types.ts`](https://github.com/johannesjo/super-productivity/blob/master/packages/plugin-api/src/issue-provider-types.ts). Examples in-repo: [`packages/plugin-dev/`](https://github.com/johannesjo/super-productivity/tree/master/packages/plugin-dev).
 
@@ -202,7 +206,7 @@ Per **[plugin-development.md § Security Considerations](https://github.com/supe
 - `plugin.js` runs **in the host renderer via `new Function`**, sharing the page context — it can reach privileged host APIs. **Only install plugins from sources you trust and audit the source.**
 - Iframe plugins use `allow-same-origin` (required for `file://` desktop builds) — the filtered `PluginAPI` bridge is a convenience, not a hard boundary; the iframe can read `window.parent.ea`.
 - `nodeExecution` is never requested by this plugin. If ever added, it would require an explicit native consent dialog per plugin `id` (local-only, not synced).
-- Credentials are local-only via `setSecret`/`getSecret` (never synced/exported). Declaring `http` + `allowedHosts` is not needed for `issueProvider` (its `PluginHttp` is pre-authorized); for a `standard` plugin it would be mandatory.
+- Credentials are local-only via `setSecret`/`getSecret` (never synced/exported). Real tokens live in `.cred` (ignored). Declaring `http` + `allowedHosts` is not needed for `issueProvider` (its `PluginHttp` is pre-authorized); for a `standard` plugin it would be mandatory.
 
 ---
 
@@ -220,13 +224,15 @@ spsync/
 ├── manifest.json   # PluginManifest (issueProvider ZAMMAD)
 ├── plugin.js       # registerIssueProvider
 ├── icon.svg        # plugin icon
-├── LICENSE         # MIT
+├── LICENSE         # MIT (© NehwonLM)
+├── .cred           # real credentials (ignored)
+├── .cred.example   # template
 └── scripts/
     ├── bump.sh             # M.m.f bump helper
     └── hooks/pre-commit    # enforces VERSION bump
 ```
 
-- **Feasibility (FR history):** previous French analysis is preserved in git history (`git show main:PROJET.md` before this commit).
+- **Feasibility (FR history):** previous French analysis is preserved in git history (`git show main:PROJET.md` before this commit). Real endpoints/tokens are in `.cred`.
 - **Full plugin guide:** [`docs/plugin-development.md`](https://github.com/super-productivity/super-productivity/blob/master/docs/plugin-development.md).
 
 ---
@@ -248,7 +254,7 @@ See [VERSIONING.md](VERSIONING.md). Summary:
 
 ## Publishing (MIT)
 
-- License: **MIT** ([LICENSE](LICENSE)) — Copyright (c) 2026 Fabrice Lamachère (SMiDeN) and contributors. Chosen for community compatibility and as suggested for Super Productivity community plugins.
+- License: **MIT** ([LICENSE](LICENSE)) — Copyright (c) 2026 NehwonLM and contributors. Chosen for community compatibility and as suggested for Super Productivity community plugins.
 - To propose to the community list: PR to the Super Productivity repo or post on GitHub Discussions / Reddit per [`plugin-development.md § Contributing`](https://github.com/super-productivity/super-productivity/blob/master/docs/plugin-development.md#contributing).
 - Keep `manifest.json` fields accurate (`id: zammad-spsync`, kebab-case, ≤100 chars for future `nodeExecution` if ever needed), `minSupVersion` honest, and ZIP minimal (no external CDN assets).
 
