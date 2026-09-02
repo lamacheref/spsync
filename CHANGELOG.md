@@ -5,6 +5,15 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.13] - 2026-09-02
+
+### Changed
+- `plugin.js:getNewIssuesForBacklog` now **does NOT use backlog at all** — returns `[]` so SP doesn't add to backlog (user: “backlog is shit”); tasks are created **directly as real tasks in the selected folder / dedicated “Zammad” project** via `addTask({projectId: <Zammad>})` only
+- `manifest.json:defaultAutoAddToBacklog` `true → false` (backlog disabled by default, per user request)
+
+### Fixed
+- `plugin.js`: backlog was empty — `getNewIssuesForBacklog` now **directly indexes in dedicated “Zammad” project** (via `getAllProjects`/`addProject`, `addTask` with `projectId`) in addition to backlog, so tasks appear even if `isEnableBacklog` is off or backlog hidden; also handles `+` click via `getById` fallback already in `0.3.11` (now in `0.3.13` only direct, no backlog)
+
 ## [0.3.12] - 2026-09-02
 
 ### Fixed

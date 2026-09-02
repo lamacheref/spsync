@@ -616,10 +616,10 @@ PluginAPI.registerIssueProvider({
       console.log('[Zammad SPsync] persist lastSyncAt', nowIso, 'seen', capped.length);
     } catch (e) { console.warn('[Zammad SPsync] persist lastSyncAt failed', e); }
 
-    // F2.5: single notification if any new
+    // F2.5: single notification if any new (direct to Zammad project, not backlog per user request)
     if (anyNew && results.length) {
       try {
-        const msg = `${results.length} new ticket(s) assigned to you`;
+        const msg = `${results.length} new ticket(s) assigned to you → added to Zammad project`;
         PluginAPI.showSnack({ msg, type: 'SUCCESS' });
         if (typeof PluginAPI.notify === 'function') {
           PluginAPI.notify({ title: 'Zammad SPsync', body: msg });
@@ -635,16 +635,14 @@ PluginAPI.registerIssueProvider({
       if (openTickets.length) {
         console.log('[Zammad SPsync] pending check — open tickets', openTickets.length);
         await handlePendingToOpen(openTickets, base, cached, timeout);
-      } else {
-        // Still need to update stateCache for future detection even if no pending transition this poll
-        // Persist current open tickets states for next comparison (if we fetched none, keep existing cache)
       }
     } catch (e) {
       console.warn('[Zammad SPsync] pending check failed', e && e.message);
     }
 
-    console.log('[Zammad SPsync] getNewIssuesForBacklog →', results.length, results.map(r => r.id));
-    return results;
+    console.log('[Zammad SPsync] getNewIssuesForBacklog → direct Zammad project, not backlog (user: backlog is shit) →', results.length);
+    // Return empty so SP does NOT add to backlog — tasks are already created directly in the selected/Zammad folder via addTask above
+    return [];
   },
 
   getIssueLink(issueId, config) {
