@@ -5,6 +5,18 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.1.8] - 2026-09-02
+
+### Added
+- **Phase 1 Reading** (`F1.1-F1.5`): `plugin.js` wired to real Zammad (`PluginHttp` `timeout` from `zammadTimeout`, `searchIssues` `limit 50` `sort_by updated_at desc`, `getById` `ticket` + `ticket_articles` → `PluginIssue` with `pendingTime`/`ownerId`/`commentsConfig`, `testConnection` real `GET /users/me` + `GET /ticket_states` + `cachedUserId` via `persistDataSynced`, `issueDisplay` pendingTime/group, `commentsConfig`, `fieldMappings`, error `showSnack`)
+- Verified `node --check`, ZIP `manifest.json` at root
+
+## [0.1.7] - 2026-09-02
+
+### Changed
+- Docs maintenance: `TODO.md` Phase 0 ✅ DONE update, `CHANGELOG.md` linked in `README.md`/`PROJET.md` `## Changelog` sections (TOC + badge auto-sync), bump `0.1.6 → 0.1.7`
+- `PROJET.md`/`README.md` badges auto-synced via `scripts/bump.sh` + CI
+
 ## [0.1.6] - 2026-09-02
 
 ### Changed

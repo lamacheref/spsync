@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 0 scaffold delivered (`0.1.6`), see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 1 reading delivered (`0.1.8`), Phase 2 next, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
@@ -19,13 +19,13 @@
 - [x] `i18n` EN+FR (`i18n/en.json`, `fr.json`), `manifest.json:iFrame true`, `icon.svg`
 - [x] ZIP install testable (Settings → Plugins → Choose Plugin File) + DevTools `F12` + https://test-app.super-productivity.com
 
-## Phase 1 — issueProvider Reading 🔜 NEXT (target 0.2.0 minor)
+## Phase 1 — issueProvider Reading ✅ DONE (0.1.8)
 
-- [ ] Wire `PluginHttp` real calls: `GET <ZAMMAD_URL>/api/v1/tickets/search?query=...` + `GET /ticket_articles/by_ticket/:id` with `Authorization: Token token=<ZAMMAD_TOKEN>` (via `getSecret`)
-- [ ] Resolve `zammadUserId` via `GET /users/me` if empty, cache `owner_id:<ZAMMAD_USER_ID>`
-- [ ] Map `ticket` → `PluginSearchResult` / `PluginIssue` (status `new/open/pending`, `assignee`, `labels`, `lastUpdated`, `comments`)
-- [ ] Pagination `limit 50` + sort `updated_at desc`
-- [ ] `testConnection` real: `GET /users/me` + `GET /ticket_states` → snack SUCCESS/ERROR
+- [x] Wire `PluginHttp` real calls: `GET <ZAMMAD_URL>/api/v1/tickets/search?query=...` + `GET /ticket_articles/by_ticket/:id` with `Authorization: Token token=<ZAMMAD_TOKEN>` (via `getSecret`, `PluginHttp` `timeout` from `zammadTimeout`)
+- [x] Resolve `zammadUserId` via `GET /users/me` if empty, cache `owner_id:<ZAMMAD_USER_ID>` in `persistDataSynced.cachedUserId`
+- [x] Map `ticket` → `PluginSearchResult` / `PluginIssue` (status `new/open/pending/closed/merged`, `assignee`, `labels` group, `lastUpdated`, `comments` via `ticket_articles`, `pendingTime`/`ownerId` extras)
+- [x] Pagination `limit 50` + `sort_by: updated_at` `order_by: desc` (`searchIssues` params)
+- [x] `testConnection` real: `GET /users/me` + `GET /ticket_states` → `showSnack(ERROR)` on fail, cache userId
 
 ## Phase 2 — Use-case B: Newly Assigned (0.3.0)
 
