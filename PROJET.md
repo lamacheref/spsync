@@ -3,11 +3,12 @@
 > **Bridge Zammad → Super Productivity.** Turns Zammad tickets into Super Productivity tasks via a native `issueProvider` plugin.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.3-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)](VERSION)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-spsync-lightgrey.svg)](#)
+[![GitHub](https://img.shields.io/badge/GitHub-lamacheref%2Fspsync-181717.svg?logo=github)](https://github.com/lamacheref/spsync)
 
-**Repository:** `<GITEA_URL>` (e.g. `https://gitea.example.com/<user>/spsync.git`) — work branch `Dev`, releases on `main`, versioning `M.m.f` (see [VERSIONING.md](VERSIONING.md)). Real URL is stored in `.cred` (ignored).
+**Repository:** `<GITEA_URL>` (e.g. `https://gitea.example.com/<user>/spsync.git`) mirrored to `git@github.com:lamacheref/spsync.git` — work branch `Dev`, releases on `main`, versioning `M.m.f` (see [VERSIONING.md](VERSIONING.md)). Real URLs are stored in `.cred` (ignored). `git push origin` pushes to both remotes (see `git remote -v`).
 
 ---
 

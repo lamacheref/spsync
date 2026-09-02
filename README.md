@@ -3,10 +3,11 @@
 > **Zammad → Super Productivity.** A native `issueProvider` plugin that turns your Zammad tickets into Super Productivity tasks — right where you work.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.3-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)](VERSION)
 [![Manifest](https://img.shields.io/badge/manifest-issueProvider-9cf.svg)](manifest.json)
 [![Super Productivity](https://img.shields.io/badge/SP-%3E%3D14.0.2-orange.svg)](https://github.com/johannesjo/super-productivity)
 [![Gitea](https://img.shields.io/badge/Gitea-Dev-lightgrey.svg)](#)
+[![GitHub](https://img.shields.io/badge/GitHub-lamacheref%2Fspsync-181717.svg?logo=github)](https://github.com/lamacheref/spsync)
 [![Plugin Type](https://img.shields.io/badge/type-issueProvider-important.svg)](https://github.com/super-productivity/super-productivity/wiki/2.15-Develop-a-Plugin)
 [![Docs](https://img.shields.io/badge/docs-EN-blueviolet.svg)](PROJET.md)
 
@@ -163,9 +164,15 @@ spsync/
 ## Development
 
 ```bash
-git clone <GITEA_URL>
+# Clone — mirrored on Gitea and GitHub (kept in sync)
+git clone <GITEA_URL>          # or: git@github.com:lamacheref/spsync.git
 cd spsync
 git checkout Dev
+# remotes (already configured): origin pushes to both Gitea and GitHub
+#   origin  → Gitea (fetch) + Gitea+GitHub (push)
+#   github  → git@github.com:lamacheref/spsync.git
+git remote -v
+
 cp .cred.example .cred   # fill real values
 
 # code
