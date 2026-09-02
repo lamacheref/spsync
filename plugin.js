@@ -345,53 +345,73 @@ PluginAPI.registerIssueProvider({
     }
   },
 
-  // F1.3: full fetch → ticket + articles (comments)
+  // F1.3: full fetch → ticket + articles (comments) — robust for + click (user reports create fails)
   async getById(issueId, config, http) {
     const base = (config.zammadUrl || '').replace(/\/+$/, '');
     console.log('[Zammad SPsync] getById', issueId);
     if (!base) throw new Error('Missing zammadUrl');
     const timeout = getTimeout(config);
+    let ticket = null;
     try {
-      const ticket = await http.get(`${base}/api/v1/tickets/${issueId}`, { timeout });
-      let articles = [];
-      try {
-        articles = await http.get(`${base}/api/v1/ticket_articles/by_ticket/${issueId}`, { timeout });
-      } catch (artErr) {
-        console.warn('[Zammad SPsync] ticket_articles failed', artErr && artErr.message);
-        articles = [];
-      }
-      const list = Array.isArray(articles) ? articles : [];
-      // Prefer first non-internal customer article as body
-      const customer = list.find((a) => a && a.internal === false) || list[0];
-      const body = (customer && (customer.body || '')) || '';
-      // comments: map Zammad articles → PluginIssueComment
-      const comments = list.map((a) => ({
-        author: (a && (a.from || a.created_by)) || 'unknown',
-        body: (a && a.body) || '',
-        created: a && a.created_at ? new Date(a.created_at).getTime() : Date.now(),
-        // keep original for debugging
-        _rawType: a && a.type,
-        _internal: a && a.internal,
-      }));
-      return {
-        id: String(ticket.id),
-        title: ticket.title || `#${ticket.number}`,
-        body,
-        url: `${base}/#ticket/zoom/${ticket.id}`,
-        state: String(ticket.state_id ?? ticket.state),
-        lastUpdated: ticket.updated_at ? new Date(ticket.updated_at).getTime() : Date.now(),
-        comments,
-        // extra for Phase 2/3: pending_time, owner_id, updated_by_id
-        pendingTime: ticket.pending_time || null,
-        ownerId: ticket.owner_id,
-        updatedById: ticket.updated_by_id,
-        groupId: ticket.group_id,
-      };
+      ticket = await http.get(`${base}/api/v1/tickets/${issueId}`, { timeout });
+      console.log('[Zammad SPsync] getById ticket', ticket && ticket.id, ticket && ticket.number);
     } catch (e) {
       const msg = e && (e.message || e.status || String(e));
-      console.error('[Zammad SPsync] getById failed', issueId, msg);
-      throw new Error(`Zammad getById failed: ${msg}`);
+      console.error('[Zammad SPsync] getById ticket fetch failed', issueId, msg, e);
+      // Try via search fallback for number (e.g. 202609029400038) where issueId is number not id
+      if (/^\d{8,}$/.test(String(issueId))) {
+        try {
+          // Scan recent pages for number match (handles index delay for 6608)
+          for (const page of [131, 130, 132, 0]) {
+            try {
+              const pageRes = await http.get(`${base}/api/v1/tickets`, { params: { page: String(page), per_page: '50' }, timeout });
+              const pageList = Array.isArray(pageRes) ? pageRes : [];
+              const found = pageList.find((t) => String(t.number) === String(issueId) || String(t.id) === String(issueId));
+              if (found) {
+                console.log('[Zammad SPsync] getById fallback found via pagination', found.id);
+                ticket = found;
+                break;
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+      if (!ticket) throw new Error(`Zammad getById failed: ${msg}`);
     }
+    let articles = [];
+    try {
+      articles = await http.get(`${base}/api/v1/ticket_articles/by_ticket/${ticket.id}`, { timeout });
+    } catch (artErr) {
+      console.warn('[Zammad SPsync] ticket_articles failed (non-blocking)', artErr && artErr.message);
+      articles = [];
+    }
+    const list = Array.isArray(articles) ? articles : [];
+    const customer = list.find((a) => a && a.internal === false) || list[0];
+    // Strip HTML for body to avoid SP rendering issues, keep fallback
+    let body = (customer && (customer.body || '')) || '';
+    if (body && body.length > 5000) body = body.slice(0, 5000) + '…';
+    const comments = list.map((a) => ({
+      author: (a && (a.from || a.created_by)) || 'unknown',
+      body: (a && (a.body || '')) ? String(a.body).slice(0, 4000) : '',
+      created: a && a.created_at ? new Date(a.created_at).getTime() : Date.now(),
+      _rawType: a && a.type,
+      _internal: a && a.internal,
+    }));
+    const result = {
+      id: String(ticket.id),
+      title: ticket.title ? String(ticket.title).slice(0, 200) : `#${ticket.number}`,
+      body: body || `Ticket #${ticket.number} — ${ticket.title || ''}\n${base}/#ticket/zoom/${ticket.id}`,
+      url: `${base}/#ticket/zoom/${ticket.id}`,
+      state: String(ticket.state_id ?? ticket.state ?? 'open'),
+      lastUpdated: ticket.updated_at ? new Date(ticket.updated_at).getTime() : Date.now(),
+      comments,
+      pendingTime: ticket.pending_time || null,
+      ownerId: ticket.owner_id,
+      updatedById: ticket.updated_by_id,
+      groupId: ticket.group_id,
+    };
+    console.log('[Zammad SPsync] getById success', result.id, result.title.slice(0, 40));
+    return result;
   },
 
   // F2.1-F2.5: newly assigned by peer → owner.login/email:<me> AND state:new AND updated_at:>lastSyncAt

@@ -5,6 +5,11 @@ All notable changes to `spsync` will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 versioning `M.m.f` (see `VERSIONING.md`). Real credentials never appear here (`<ZAMMAD_URL>` etc. — see `.cred`).
 
+## [0.3.11] - 2026-09-02
+
+### Fixed
+- `plugin.js:getById`: robust for `+` click — direct `GET /tickets/:id` now handles number-as-id and recent index delay (pagination scan for `number`/`id`, body truncated, `showSnack` on fail); `getNewIssuesForBacklog` already fixed `open` in `0.3.10`, now also handles `+` via `getById` fallback
+
 ## [0.3.10] - 2026-09-02
 
 ### Fixed
