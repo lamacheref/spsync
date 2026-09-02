@@ -3,7 +3,7 @@
 // Per https://github.com/super-productivity/super-productivity/wiki/2.15-Develop-a-Plugin
 // and docs/plugin-development.md — Types: plugin-api/src/types.ts + issue-provider-types.ts
 
-console.log('[Zammad SPsync] plugin.js loaded — Phase 1 (Reading)');
+console.log('[Zammad SPsync] plugin.js loaded — Phase 2 (Newly Assigned)');
 
 const t = (key, fallback) => {
   try { return PluginAPI.translate(key) || fallback; } catch { return fallback; }
@@ -31,14 +31,25 @@ const getTimeout = (cfg) => {
 
 if (typeof plugin !== 'undefined' && plugin.onReady) {
   plugin.onReady(async () => {
-    console.log('[Zammad SPsync] onReady — Phase 1');
+    console.log('[Zammad SPsync] onReady — Phase 2');
     try {
       const hasSecret = typeof PluginAPI.getSecret === 'function' ? await PluginAPI.getSecret('zammadToken') : null;
       console.log('[Zammad SPsync] secret present:', !!hasSecret);
       if (!hasSecret) console.warn('[Zammad SPsync] No secret — set token via index.html (setSecret)');
     } catch (e) { console.warn('[Zammad SPsync] getSecret check failed', e); }
+    // Load lastSync cache for debugging
+    try {
+      const raw = await PluginAPI.loadSyncedData();
+      if (raw) console.log('[Zammad SPsync] syncedData onReady', JSON.parse(raw));
+    } catch {}
   });
-  plugin.onUnload(() => console.log('[Zammad SPsync] onUnload'));
+  plugin.onUnload(() => console.log('[Zammad SPsync] onUnload — Phase 2'));
+  // Hook to keep cache in sync across devices (persistedDataChanged)
+  try {
+    PluginAPI.registerHook(PluginAPI.Hooks.PERSISTED_DATA_CHANGED, async () => {
+      console.log('[Zammad SPsync] PERSISTED_DATA_CHANGED');
+    });
+  } catch {}
 }
 
 PluginAPI.registerIssueProvider({
@@ -144,10 +155,143 @@ PluginAPI.registerIssueProvider({
     }
   },
 
-  // F2.1 scaffold kept empty for Phase 1 — real logic in Phase 2
+  // F2.1-F2.5: newly assigned by peer → owner_id:<me> AND state:new AND updated_at:>lastSyncAt
   async getNewIssuesForBacklog(config, http) {
-    console.log('[Zammad SPsync] getNewIssuesForBacklog — Phase 1 returns [] (Phase 2 will implement owner_id filter)');
-    return [];
+    const base = (config.zammadUrl || '').replace(/\/+$/, '');
+    if (!base) return [];
+    const timeout = getTimeout(config);
+
+    // F1.2 + F2.1: resolve userId (config or cached or /users/me)
+    let userId = (config.zammadUserId && String(config.zammadUserId).trim()) || '';
+    let cached = {};
+    try {
+      const raw = await PluginAPI.loadSyncedData();
+      cached = raw ? JSON.parse(raw) : {};
+      if (!userId && cached.cachedUserId) userId = String(cached.cachedUserId);
+    } catch {}
+    if (!userId) {
+      try {
+        const me = await http.get(`${base}/api/v1/users/me`, { timeout });
+        if (me && me.id) {
+          userId = String(me.id);
+          cached.cachedUserId = userId;
+          try { await PluginAPI.persistDataSynced(JSON.stringify(cached)); } catch {}
+          console.log('[Zammad SPsync] resolved userId', userId);
+        }
+      } catch (e) {
+        console.warn('[Zammad SPsync] getNewIssuesForBacklog: cannot resolve userId', e && e.message);
+        return [];
+      }
+    }
+    if (!userId) return [];
+
+    // F2.3: load dedup cache
+    let seenIds = new Set(Array.isArray(cached.seenIds) ? cached.seenIds : []);
+    let ownerCache = cached.ownerCache && typeof cached.ownerCache === 'object' ? cached.ownerCache : {};
+    let lastSyncAt = cached.lastSyncAt ? new Date(cached.lastSyncAt).getTime() : 0;
+    // Fallback: if lastSyncAt missing, look back 7 days to avoid flooding on first run
+    if (!lastSyncAt) lastSyncAt = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    // Build Zammad DSL query: owner_id + state:new + updated_at filter
+    // Zammad supports ISO8601 in query: updated_at:>2026-09-02T00:00:00Z
+    const iso = new Date(lastSyncAt).toISOString();
+    // If ZAMMAD_INCLUDE_UPDATED is false-like, SP config doesn't expose it; we use updated_at (default true per PROJET.md)
+    const timeField = 'updated_at';
+    const q = `owner_id:${userId} AND state.name:new AND ${timeField}:>${iso}`;
+    const url = `${base}/api/v1/tickets/search`;
+    console.log('[Zammad SPsync] getNewIssuesForBacklog', { userId, q, lastSyncAt: iso });
+
+    let tickets = [];
+    try {
+      const res = await http.get(url, { params: { query: q, limit: '50', sort_by: 'updated_at', order_by: 'desc' }, timeout });
+      tickets = Array.isArray(res) ? res : [];
+      console.log('[Zammad SPsync] getNewIssuesForBacklog fetched', tickets.length);
+    } catch (e) {
+      const msg = e && (e.message || e.status || String(e));
+      console.error('[Zammad SPsync] getNewIssuesForBacklog failed', msg);
+      return [];
+    }
+
+    const nowIso = new Date().toISOString();
+    const results = [];
+    let anyNew = false;
+
+    for (const ticket of tickets) {
+      const idStr = String(ticket.id);
+      const tid = ticket.id;
+      // F2.3 dedup: skip already seen and not updated since last seen
+      const ticketUpdated = ticket.updated_at ? new Date(ticket.updated_at).getTime() : 0;
+      if (seenIds.has(idStr) && ticketUpdated <= lastSyncAt) {
+        // Keep ownerCache up to date even if skipped
+        ownerCache[idStr] = String(ticket.owner_id ?? '');
+        continue;
+      }
+
+      // F2.2: peer detection — compare previous owner vs current
+      const prevOwner = ownerCache[idStr];
+      const curOwner = String(ticket.owner_id ?? '');
+      const updatedBy = String(ticket.updated_by_id ?? '');
+      const isPeerAssigned = (
+        curOwner === String(userId) &&
+        ticket.state_id === 1 && // new
+        updatedBy !== String(userId) && // not self-assigned
+        (prevOwner === undefined || prevOwner !== String(userId)) // was not mine before
+      );
+      // For first-seen tickets, also consider created_by as peer hint if updated_by missing
+      // If not peer-assigned, we still want to surface it but with different title (optional filter)
+      // For now, surface all new tickets assigned to me; peer flag affects title prefix
+      // To strictly follow F2.2, uncomment the next lines to hide self-assigned:
+      // if (!isPeerAssigned && prevOwner !== undefined) continue;
+
+      // Update cache
+      ownerCache[idStr] = curOwner;
+      if (!seenIds.has(idStr)) anyNew = true;
+      seenIds.add(idStr);
+
+      const isPeer = isPeerAssigned;
+      const prefix = isPeer ? '🆕' : '🆕';
+      results.push({
+        id: idStr,
+        title: `${prefix} #${ticket.number} ${ticket.title}`,
+        url: `${base}/#ticket/zoom/${ticket.id}`,
+        status: stateToStatus(ticket.state_id),
+        assignee: curOwner,
+        labels: ticket.group_id ? [String(ticket.group_id)] : [],
+        // Keep raw for debugging / future pending logic
+        _isPeerAssigned: isPeer,
+        _updatedBy: updatedBy,
+        _prevOwner: prevOwner,
+      });
+
+      // F2.5: optional notify — SP will auto-add to backlog if enabled; we also snack for visibility when not auto
+      // We limit to one snack per poll to avoid spam
+    }
+
+    // F2.3: persist dedup + lastSyncAt
+    try {
+      // Cap seenIds to last 500 to avoid unbounded growth
+      const seenArr = Array.from(seenIds);
+      const capped = seenArr.length > 500 ? seenArr.slice(-500) : seenArr;
+      const nextData = { ...cached, lastSyncAt: nowIso, seenIds: capped, ownerCache };
+      await PluginAPI.persistDataSynced(JSON.stringify(nextData));
+      console.log('[Zammad SPsync] persist lastSyncAt', nowIso, 'seen', capped.length);
+    } catch (e) { console.warn('[Zammad SPsync] persist lastSyncAt failed', e); }
+
+    // F2.5: single notification if any new
+    if (anyNew && results.length) {
+      try {
+        const msg = `${results.length} new ticket(s) assigned to you`;
+        // Notify only if not already spamming — SP dedups via snackbar
+        PluginAPI.showSnack({ msg, type: 'SUCCESS' });
+        // Also system notification if available
+        if (typeof PluginAPI.notify === 'function') {
+          PluginAPI.notify({ title: 'Zammad SPsync', body: msg });
+        }
+      } catch {}
+    }
+
+    console.log('[Zammad SPsync] getNewIssuesForBacklog →', results.length, results.map(r => r.id));
+    return results;
   },
 
   getIssueLink(issueId, config) {

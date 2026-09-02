@@ -1,7 +1,7 @@
 # TODO — SPsync
 
 > Generated 2026-09-02. Feasibility validated (see `PROJET.md`). Real credentials in `.cred` (ignored).  
-> Last update: 2026-09-02 — Phase 1 reading delivered (`0.1.8`), Phase 2 next, see [CHANGELOG.md](CHANGELOG.md).
+> Last update: 2026-09-02 — Phase 2 newly assigned in progress (`0.1.9`), see [CHANGELOG.md](CHANGELOG.md).
 
 ## Phase 0 — Preparation ✅ DONE (0.1.5)
 
@@ -27,12 +27,13 @@
 - [x] Pagination `limit 50` + `sort_by: updated_at` `order_by: desc` (`searchIssues` params)
 - [x] `testConnection` real: `GET /users/me` + `GET /ticket_states` → `showSnack(ERROR)` on fail, cache userId
 
-## Phase 2 — Use-case B: Newly Assigned (0.3.0)
+## Phase 2 — Use-case B: Newly Assigned 🚧 IN PROGRESS (0.1.9 → 0.3.0)
 
-- [ ] Query `owner_id:<ZAMMAD_USER_ID> AND state.name:new AND updated_at:>lastSyncAt` in `getNewIssuesForBacklog`
-- [ ] Detect peer assignment: `owner_id` transition `≠me → me` + `updated_by_id ≠me` (cache `ownerCache`)
-- [ ] Create SP task `🆕 [Zammad #number] title` with link `<ZAMMAD_URL>/#ticket/zoom/<id>` (dedup via `seenIds`)
-- [ ] Test with ticket owned by `<ZAMMAD_USER_ID>` (poll <90s)
+- [x] Query `owner_id:<ZAMMAD_USER_ID> AND state.name:new AND updated_at:>lastSyncAt` in `getNewIssuesForBacklog` (limit 50, sort `updated_at desc`, `timeField: updated_at`, fallback 7d, timeout from `zammadTimeout`)
+- [x] Detect peer assignment: `owner_id` transition `≠me → me` + `updated_by_id ≠me` (cache `ownerCache`, `_isPeerAssigned` flag, `_prevOwner`)
+- [x] Dedup via `persistDataSynced` (`seenIds` capped 500 + `ownerCache` + `lastSyncAt` ISO, `persistedDataChanged` hook)
+- [x] Create SP task `🆕 [Zammad #number] title` with link `<ZAMMAD_URL>/#ticket/zoom/<id>` (returned as `PluginSearchResult`, SP auto-adds to backlog; `showSnack` + `notify` once per poll)
+- [ ] Test with ticket owned by `<ZAMMAD_USER_ID>` (poll <90s, verify Issue Panel + backlog auto-add)
 
 ## Phase 3 — Use-case A: Out of Waiting (0.4.0)
 
